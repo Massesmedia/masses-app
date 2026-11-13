@@ -2,19 +2,47 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  --bg: #09090B;
-  --surface: #121214;
-  --border: #27272A;
-  --text-primary: #FFFFFF;
-  --text-muted: #A1A1AA;
+/* FORCE THE DESIGN */
+body {
+  background-color: #09090B !important;
+  color: #FFFFFF !important;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  margin: 0;
+  padding: 0;
 }
 
-body {
-  background-color: var(--bg);
-  color: var(--text-primary);
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  -webkit-font-smoothing: antialiased;
-  overscroll-behavior-y: none;
-}
-::-webkit-scrollbar { display: none; }
+/* Header */
+header { padding: 16px 20px; border-bottom: 1px solid #27272A; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; background: rgba(9,9,11,0.95); backdrop-filter: blur(10px); z-index: 10; }
+.logo-svg { width: 32px !important; height: 32px !important; border-radius: 6px; }
+.header-title { font-size: 20px; font-weight: 800; letter-spacing: 0.15em; text-transform: uppercase; }
+
+/* Tabs */
+.tabs { display: flex; border-bottom: 1px solid #27272A; background: #121214; }
+.tab { flex: 1; padding: 12px; font-size: 13px; font-weight: 600; color: #A1A1AA; text-align: center; border-bottom: 2px solid transparent; background: none; border-top: none; border-left: none; border-right: none; cursor: pointer; }
+.tab.active { color: #FFFFFF; border-bottom-color: #FFFFFF; }
+
+/* Composer */
+.composer { padding: 20px; border-bottom: 1px solid #27272A; background: #121214; }
+.composer input.name-input { width: 100%; background: transparent; border: none; border-bottom: 1px solid #27272A; color: #A1A1AA; font-size: 12px; padding-bottom: 8px; margin-bottom: 8px; outline: none; }
+.composer textarea { width: 100%; background: transparent; border: none; color: #FFFFFF; font-size: 18px; resize: none; outline: none; font-family: inherit; }
+.post-btn { background: #FFFFFF; color: #000000; font-weight: 700; padding: 8px 20px; border-radius: 99px; border: none; cursor: pointer; float: right; margin-top: 10px; }
+.post-btn:disabled { opacity: 0.3; }
+
+/* Feed */
+.post-card { padding: 20px; border-bottom: 1px solid #27272A; }
+.post-meta { display: flex; justify-content: space-between; font-size: 12px; color: #A1A1AA; margin-bottom: 8px; }
+.post-content { font-size: 18px; margin-bottom: 16px; white-space: pre-wrap; }
+.reply-toggle { background: none; border: none; color: #A1A1AA; font-size: 14px; cursor: pointer; padding: 0; }
+.thread { margin-top: 16px; padding-left: 16px; border-left: 1px solid #27272A; }
+.reply { font-size: 14px; margin-bottom: 12px; }
+.reply-name { font-size: 12px; color: #A1A1AA; display: block; margin-bottom: 4px; }
+.reply-input-box { display: flex; gap: 8px; margin-top: 12px; }
+.reply-input-box input { flex: 1; background: #09090B; border: 1px solid #27272A; border-radius: 6px; padding: 8px; color: white; outline: none; }
+.reply-input-box button { background: none; border: none; color: #FFFFFF; font-weight: bold; cursor: pointer; }
+
+/* Loading & Empty */
+.loading-box { padding: 20px; border-bottom: 1px solid #27272A; animation: pulse 1.5s infinite; }
+.skeleton-line { height: 14px; background: #27272A; border-radius: 4px; margin-bottom: 12px; }
+@keyframes pulse { 0% { opacity: 0.5; } 50% { opacity: 1; } 100% { opacity: 0.5; } }
+.empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 60px 20px; text-align: center; color: #A1A1AA; }
+.empty-state .logo-svg { width: 80px !important; height: 80px !important; opacity: 0.5; margin-bottom: 20px; }
