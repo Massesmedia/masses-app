@@ -9,26 +9,23 @@ export async function GET(request: Request) {
   if (!key) return NextResponse.json({ error: 'Key required' }, { status: 400 });
 
   try {
-    // 1. Get messages where I am the receiver (Inbox)
     const received = await prisma.directMessage.findMany({
       where: { receiverKey: key },
       orderBy: { createdAt: 'desc' },
     });
 
-    // 2. Get messages where I am the sender (Sent)
     const sent = await prisma.directMessage.findMany({
       where: { senderKey: key },
       orderBy: { createdAt: 'desc' },
     });
 
-    // Combine them so the user sees the full conversation
     const allMessages = [...received, ...sent].sort((a, b) => 
       new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
     );
 
     return NextResponse.json({ messages: allMessages });
   } catch (error) {
-    console.error("INBOX API ERROR:", error);
+    console.error("INBOX GET ERROR:", error);
     return NextResponse.json({ error: 'Failed to fetch inbox' }, { status: 500 });
   }
 }
@@ -37,7 +34,6 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
     
-    // We generate a real UUID for the message so it links properly
     const message = await prisma.directMessage.create({
       data: {
         postId: body.postId,
