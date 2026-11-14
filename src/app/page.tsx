@@ -16,6 +16,19 @@ const Logo = ({ className }: { className?: string }) => (
   </svg>
 );
 
+// Generates a unique color gradient based on the user's name
+const getAvatarGradient = (name: string) => {
+  const colors = [
+    'from-[#FF416C] to-[#FF4B2B]', 'from-[#00B4DB] to-[#0083B0]',
+    'from-[#8E2DE2] to-[#4A00E0]', 'from-[#11998e] to-[#38ef7d]',
+    'from-[#FC5C7D] to-[#6A82FB]', 'from-[#F2994A] to-[#F2C94C]',
+    'from-[#7C3AED] to-[#DB2777]'
+  ];
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  return colors[Math.abs(hash) % colors.length];
+};
+
 export default function Home() {
   const [posts, setPosts] = useState<Post[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -46,11 +59,8 @@ export default function Home() {
   }, []);
 
   useEffect(() => { 
-    if (tab === 'inbox' && deviceKey) {
-      fetchInbox();
-    } else {
-      fetchPosts(); 
-    }
+    if (tab === 'inbox' && deviceKey) fetchInbox();
+    else fetchPosts(); 
   }, [sort, tab, searchQuery, deviceKey]);
 
   const fetchPosts = async () => {
@@ -119,15 +129,15 @@ export default function Home() {
 
   const restoreKey = () => {
     const input = prompt("Paste your Secret Recovery Key here:");
-    if (input && input.startsWith('dk_')) {
-      localStorage.setItem('masses_device_key', input);
-      setDeviceKey(input);
-      setIsMenuOpen(false);
-      alert("Identity Restored!");
-      if (tab === 'inbox') fetchInbox();
-      else fetchPosts();
-    } else {
-      alert("Invalid key.");
+    if (input) {
+      const cleanKey = input.trim();
+      if (cleanKey.startsWith('dk_')) {
+        localStorage.setItem('masses_device_key', cleanKey);
+        setDeviceKey(cleanKey);
+        setIsMenuOpen(false);
+        alert("Identity Restored!");
+        if (tab === 'inbox') fetchInbox(); else fetchPosts();
+      } else { alert("Invalid key format."); }
     }
   };
 
@@ -137,18 +147,14 @@ export default function Home() {
       <header className="sticky top-0 bg-[#050505]/80 backdrop-blur-xl border-b border-[#27272A] p-4 flex justify-between items-center z-40">
         <div className="flex items-center gap-3">
           <button onClick={() => setIsMenuOpen(true)} className="text-[#A1A1AA] hover:text-white p-2 -ml-2">
-             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-6 h-6">
-               <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
-             </svg>
+             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-6 h-6"><path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" /></svg>
           </button>
-          
           <div className="relative">
             <Logo className="w-8 h-8 rounded-[10px] relative z-10" />
             <div className="absolute inset-0 bg-[#7C3AED] blur-md opacity-20 rounded-[10px] z-0"></div>
           </div>
           <span className="text-xl font-black tracking-[0.15em] bg-clip-text text-transparent bg-gradient-to-br from-[#7C3AED] to-[#DB2777]">Masses</span>
         </div>
-
         {tab === 'feed' && (
           <button onClick={() => setSort(sort === 'new' ? 'hot' : 'new')} className="text-xs font-semibold text-[#A1A1AA] border border-[#27272A] bg-[#121214] px-3 py-1.5 rounded-lg hover:text-white transition-colors">{sort === 'new' ? 'NEW' : 'HOT'}</button>
         )}
@@ -195,52 +201,74 @@ export default function Home() {
         : posts.map((post) => {
             const isOpen = openThreads.has(post.id);
             const isAuthor = post.authorKey === deviceKey;
-            return (
-              <div key={post.id} className="p-5 border-b border-[#27272A] hover:bg-[#121214]/40 transition-colors">
-                <div className="flex justify-between text-[13px] text-[#A1A1AA] mb-3 font-medium">
-                  <span>{post.displayName} <span className="bg-white/5 border border-[#27272A] px-2 py-0.5 rounded-md ml-2 text-[11px]">ID:{post.id.slice(0,4)}</span></span>
-                  <span>{new Date(post.createdAt).toLocaleDateString()}</span>
-                </div>
-                <p className="text-[17px] mb-4 whitespace-pre-wrap leading-relaxed">{post.content}</p>
-                
-                <div className="flex items-center gap-4">
-                  <button onClick={() => toggleThread(post.id)} className={`flex items-center gap-2 text-sm font-medium px-3 py-2 -ml-3 rounded-lg transition-colors ${isOpen ? 'text-[#7C3AED]' : 'text-[#A1A1AA] hover:text-[#7C3AED] hover:bg-[#7C3AED]/10'}`}>
-                    <span className={`text-[10px] transition-transform ${isOpen ? 'rotate-90' : ''}`}>▶</span>
-                    {post.comments.length} Replies
-                  </button>
+            const avatarGradient = getAvatarGradient(post.displayName);
+            const initial = post.displayName.charAt(0).toUpperCase();
 
-                  {!isAuthor && post.authorKey && (
-                    <button onClick={() => setMessagingPost(post)} className="text-sm font-medium text-[#A1A1AA] hover:text-[#DB2777] transition-colors">
-                      ✉ Message Author
+            return (
+              <div key={post.id} className="p-4 border-b border-[#27272A] hover:bg-[#121214]/40 transition-colors flex gap-3">
+                
+                {/* AVATAR */}
+                <div onClick={() => { if (!isAuthor && post.authorKey) setMessagingPost(post); }} className={`w-11 h-11 rounded-full flex-shrink-0 flex items-center justify-center font-bold text-lg text-white bg-gradient-to-br ${avatarGradient} ${!isAuthor && post.authorKey ? 'cursor-pointer hover:opacity-80' : ''}`}>
+                  {initial}
+                </div>
+
+                <div className="flex-1 min-w-0">
+                  <div className="flex justify-between text-[13px] text-[#A1A1AA] mb-1 font-medium items-center">
+                    <span onClick={() => { if (!isAuthor && post.authorKey) setMessagingPost(post); }} className={`truncate ${!isAuthor && post.authorKey ? 'cursor-pointer hover:text-white' : ''}`}>
+                      {post.displayName} <span className="text-[11px] ml-1 opacity-70">ID:{post.id.slice(0,4)}</span>
+                    </span>
+                    <span className="flex-shrink-0 ml-2">{new Date(post.createdAt).toLocaleDateString()}</span>
+                  </div>
+
+                  <p className="text-[16px] mb-3 whitespace-pre-wrap leading-relaxed">{post.content}</p>
+                  
+                  <div className="flex items-center gap-6">
+                    <button onClick={() => toggleThread(post.id)} className={`flex items-center gap-2 text-sm font-medium transition-colors ${isOpen ? 'text-[#7C3AED]' : 'text-[#A1A1AA] hover:text-[#7C3AED]'}`}>
+                      <span className={`text-[10px] transition-transform ${isOpen ? 'rotate-90' : ''}`}>▶</span>
+                      {post.comments.length} Replies
                     </button>
+
+                    {!isAuthor && post.authorKey && (
+                      <button onClick={() => setMessagingPost(post)} className="text-sm font-medium text-[#A1A1AA] hover:text-[#DB2777] transition-colors flex items-center gap-1">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4"><path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" /></svg>
+                        Message
+                      </button>
+                    )}
+                  </div>
+
+                  {messagingPost?.id === post.id && (
+                    <div className="mt-3 p-3 bg-[#1A1A1D] border border-[#7C3AED]/50 rounded-xl">
+                      <p className="text-xs text-[#A1A1AA] mb-2">Private message to {post.displayName}</p>
+                      <input type="text" placeholder="Type message..." value={dmTexts[post.id] || ''} onChange={(e) => setDmTexts({...dmTexts, [post.id]: e.target.value})} className="w-full bg-[#050505] border border-[#27272A] rounded-lg p-2 text-sm text-white outline-none focus:border-[#7C3AED] mb-2" />
+                      <div className="flex justify-end gap-2">
+                        <button onClick={() => setMessagingPost(null)} className="text-xs text-[#A1A1AA]">Cancel</button>
+                        <button onClick={() => submitDM(post)} className="text-xs font-bold text-[#7C3AED]">Send</button>
+                      </div>
+                    </div>
+                  )}
+
+                  {isOpen && (
+                    <div className="mt-4 space-y-3">
+                      {post.comments.map(c => {
+                        const cGradient = getAvatarGradient(c.displayName);
+                        return (
+                        <div key={c.id} className="flex gap-2">
+                          <div className={`w-7 h-7 rounded-full flex-shrink-0 flex items-center justify-center font-bold text-xs text-white bg-gradient-to-br ${cGradient}`}>
+                            {c.displayName.charAt(0).toUpperCase()}
+                          </div>
+                          <div className="flex-1 bg-[#121214] p-2 rounded-xl border border-[#27272A]">
+                            <span className="text-xs text-[#A1A1AA] block mb-1 font-semibold">{c.displayName}</span>
+                            <span className="text-[14px]">{c.content}</span>
+                          </div>
+                        </div>
+                      )})}
+                      <div className="flex gap-2 mt-3 pl-9">
+                        <input type="text" placeholder="Reply publicly..." value={replyTexts[post.id] || ''} onChange={(e) => setReplyTexts({ ...replyTexts, [post.id]: e.target.value })} className="flex-1 bg-[#050505] border border-[#27272A] rounded-xl p-3 text-sm outline-none focus:border-[#7C3AED] transition-all text-white" onKeyDown={(e) => e.key === 'Enter' && submitReply(post.id)} />
+                        <button onClick={() => submitReply(post.id)} className="text-sm font-bold px-3 text-[#7C3AED] hover:text-[#9d6bff]">Reply</button>
+                      </div>
+                    </div>
                   )}
                 </div>
-
-                {messagingPost?.id === post.id && (
-                  <div className="mt-4 p-4 bg-[#1A1A1D] border border-[#7C3AED]/50 rounded-xl">
-                    <p className="text-xs text-[#A1A1AA] mb-2">Send a private message to the author.</p>
-                    <input type="text" placeholder="Type private message..." value={dmTexts[post.id] || ''} onChange={(e) => setDmTexts({...dmTexts, [post.id]: e.target.value})} className="w-full bg-[#050505] border border-[#27272A] rounded-lg p-3 text-sm text-white outline-none focus:border-[#7C3AED] mb-2" />
-                    <div className="flex justify-end gap-2">
-                      <button onClick={() => setMessagingPost(null)} className="text-xs text-[#A1A1AA]">Cancel</button>
-                      <button onClick={() => submitDM(post)} className="text-xs font-bold text-[#7C3AED]">Send DM</button>
-                    </div>
-                  </div>
-                )}
-
-                {isOpen && (
-                  <div className="mt-4 pl-5 border-l-2 border-[#27272A] space-y-3">
-                    {post.comments.map(c => (
-                      <div key={c.id} className="text-[15px] bg-[#121214] p-3 rounded-xl border border-[#27272A]">
-                        <span className="text-xs text-[#A1A1AA] block mb-1 font-semibold">{c.displayName}</span>
-                        {c.content}
-                      </div>
-                    ))}
-                    <div className="flex gap-2 mt-3">
-                      <input type="text" placeholder="Reply publicly..." value={replyTexts[post.id] || ''} onChange={(e) => setReplyTexts({ ...replyTexts, [post.id]: e.target.value })} className="flex-1 bg-[#050505] border border-[#27272A] rounded-xl p-3 text-sm outline-none focus:border-[#7C3AED] transition-all text-white" onKeyDown={(e) => e.key === 'Enter' && submitReply(post.id)} />
-                      <button onClick={() => submitReply(post.id)} className="text-sm font-bold px-3 text-[#7C3AED] hover:text-[#9d6bff]">Reply</button>
-                    </div>
-                  </div>
-                )}
               </div>
             );
         })}
@@ -250,18 +278,19 @@ export default function Home() {
         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-6 h-6 text-white"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
       </button>
 
+      {/* BIGGER BOTTOM NAVIGATION ICONS */}
       <nav className="fixed bottom-0 left-0 right-0 max-w-[600px] mx-auto bg-[#050505]/95 backdrop-blur-xl border-t border-[#27272A] flex justify-around items-center h-16 z-50 px-2">
-        <button onClick={() => setTab('feed')} className={`flex flex-col items-center justify-center w-full h-full space-y-1 ${tab === 'feed' ? 'text-[#7C3AED]' : 'text-[#A1A1AA] hover:text-white'}`}>
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-6 h-6"><path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12l8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25" /></svg>
+        <button onClick={() => setTab('feed')} className={`flex flex-col items-center justify-center w-full h-full ${tab === 'feed' ? 'text-[#7C3AED]' : 'text-[#A1A1AA] hover:text-white'}`}>
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-7 h-7"><path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12l8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25" /></svg>
         </button>
-        <button onClick={() => setTab('search')} className={`flex flex-col items-center justify-center w-full h-full space-y-1 ${tab === 'search' ? 'text-[#7C3AED]' : 'text-[#A1A1AA] hover:text-white'}`}>
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-6 h-6"><path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" /></svg>
+        <button onClick={() => setTab('search')} className={`flex flex-col items-center justify-center w-full h-full ${tab === 'search' ? 'text-[#7C3AED]' : 'text-[#A1A1AA] hover:text-white'}`}>
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-7 h-7"><path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" /></svg>
         </button>
-        <button onClick={() => setTab('my-posts')} className={`flex flex-col items-center justify-center w-full h-full space-y-1 ${tab === 'my-posts' ? 'text-[#7C3AED]' : 'text-[#A1A1AA] hover:text-white'}`}>
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-6 h-6"><path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" /></svg>
+        <button onClick={() => setTab('my-posts')} className={`flex flex-col items-center justify-center w-full h-full ${tab === 'my-posts' ? 'text-[#7C3AED]' : 'text-[#A1A1AA] hover:text-white'}`}>
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-7 h-7"><path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" /></svg>
         </button>
-        <button onClick={() => setTab('inbox')} className={`flex flex-col items-center justify-center w-full h-full space-y-1 ${tab === 'inbox' ? 'text-[#7C3AED]' : 'text-[#A1A1AA] hover:text-white'}`}>
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-6 h-6"><path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" /></svg>
+        <button onClick={() => setTab('inbox')} className={`flex flex-col items-center justify-center w-full h-full ${tab === 'inbox' ? 'text-[#7C3AED]' : 'text-[#A1A1AA] hover:text-white'}`}>
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-7 h-7"><path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" /></svg>
         </button>
       </nav>
 
@@ -277,22 +306,9 @@ export default function Home() {
               <div>
                 <p className="text-xs text-[#A1A1AA] mb-2 font-semibold">Your Secret Recovery Key</p>
                 <div className="flex items-center gap-2">
-                  <code className="text-[10px] text-[#7C3AED] break-all bg-[#050505] p-2 rounded border border-[#27272A] block flex-1">
-                    {deviceKey}
-                  </code>
-                  <button 
-                    onClick={() => {
-                      if (deviceKey) {
-                        navigator.clipboard.writeText(deviceKey);
-                        alert("Key copied to clipboard!");
-                      }
-                    }} 
-                    className="p-2 bg-[#7C3AED]/10 text-[#7C3AED] border border-[#7C3AED]/30 rounded-lg hover:bg-[#7C3AED]/20 transition-all"
-                    title="Copy Key"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 01-1.125-1.125V7.875c0-.621.504-1.125 1.125-1.125H6.75a9.06 9.06 0 011.5.124m7.5 10.376h3.375c.621 0 1.125-.504 1.125-1.125V11.25c0-4.46-3.243-8.161-7.5-8.876a9.06 9.06 0 00-1.5-.124H9.375c-.621 0-1.125.504-1.125 1.125v3.5m7.5 10.375H9.375a1.125 1.125 0 01-1.125-1.125v-9.25m12 6.625v-1.875a3.375 3.375 0 00-3.375-3.375h-1.5a1.125 1.125 0 01-1.125-1.125v-1.5a3.375 3.375 0 00-3.375-3.375H9.75" />
-                    </svg>
+                  <code className="text-[10px] text-[#7C3AED] break-all bg-[#050505] p-2 rounded border border-[#27272A] block flex-1">{deviceKey}</code>
+                  <button onClick={() => { if (deviceKey) { navigator.clipboard.writeText(deviceKey); alert("Key copied to clipboard!"); } }} className="p-2 bg-[#7C3AED]/10 text-[#7C3AED] border border-[#7C3AED]/30 rounded-lg hover:bg-[#7C3AED]/20 transition-all" title="Copy Key">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 01-1.125-1.125V7.875c0-.621.504-1.125 1.125-1.125H6.75a9.06 9.06 0 011.5.124m7.5 10.376h3.375c.621 0 1.125-.504 1.125-1.125V11.25c0-4.46-3.243-8.161-7.5-8.876a9.06 9.06 0 00-1.5-.124H9.375c-.621 0-1.125.504-1.125 1.125v3.5m7.5 10.375H9.375a1.125 1.125 0 01-1.125-1.125v-9.25m12 6.625v-1.875a3.375 3.375 0 00-3.375-3.375h-1.5a1.125 1.125 0 01-1.125-1.125v-1.5a3.375 3.375 0 00-3.375-3.375H9.75" /></svg>
                   </button>
                 </div>
               </div>
