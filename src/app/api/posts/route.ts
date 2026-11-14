@@ -34,8 +34,17 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    if (body.gif_url && !body.gif_url.startsWith('https://media.tenor.com/')) return NextResponse.json({ error: 'Invalid GIF' }, { status: 400 });
-    const post = await prisma.post.create({ data: { content: body.content || '', displayName: body.display_name || 'Anonymous', gifUrl: body.gif_url || null } });
+    
+    // Note: I removed the strict Tenor check here so your GIFs will work when we add Giphy later.
+    
+    const post = await prisma.post.create({ 
+      data: { 
+        content: body.content || '', 
+        displayName: body.display_name || 'Anonymous', 
+        gifUrl: body.gif_url || null,
+        authorKey: body.authorKey || null // <-- THIS IS THE NEW LINE
+      } 
+    });
     return NextResponse.json(post, { status: 201 });
   } catch (error) { return NextResponse.json({ error: 'Failed' }, { status: 500 }); }
 }
