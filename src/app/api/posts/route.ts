@@ -11,17 +11,77 @@ export async function GET(request: Request) {
 
   try {
     let posts;
+    
+    // 1. Fetch posts by Author Key (for "My Posts" restored from other devices)
     if (authorKey) {
-      posts = await prisma.post.findMany({ where: { authorKey: authorKey }, include: { comments: { orderBy: { createdAt: 'asc' } } }, orderBy: { createdAt: 'desc' } });
-    } else if (ids) {
+      posts = await prisma.post.findMany({ 
+        where: { authorKey: authorKey }, 
+        include: { comments: { orderBy: { createdAt: 'asc' } } }, 
+        orderBy: { createdAt: 'desc' } 
+      });
+    } 
+    // 2. Fetch specific IDs (for local storage My Posts)
+    else if (ids) {
       const idArray = ids.split(',');
-      posts = await prisma.post.findMany({ where: { id: { in: idArray } }, include: { comments: { orderBy: { createdAt: 'asc' } } }, orderBy: { createdAt: 'desc' } });
-    } else if (q) {
-      posts = await prisma.post.findMany({ where: { OR: [{ content: { contains: q, mode: 'insensitive' } }, { displayName: { contains: q, mode: 'insensitive' } }] }, include: { comments: { orderBy: { createdAt: 'asc' } } }, orderBy: { createdAt: 'desc' }, take: 50 });
-    } else {
-      posts = await prisma.post.findMany({ include: { comments: { orderBy: { createdAt: 'asc' } } }, take: 50 });
+      posts = await prisma.post.findMany({ 
+        where: { id: { in: idArray } }, 
+        include: { comments: { orderBy: { createdAt: 'asc' } } }, 
+        orderBy: { createdAt: 'desc' } 
+      });
+    } 
+    // 3. Search query
+    else if (q) {
+      posts = await prisma.post.findMany({ 
+        where: { 
+          OR: [
+            { content: { contains: q, mode: 'insensitive' } }, 
+            { displayName: { contains: q, mode: 'insensitive' } }
+          ] 
+        }, 
+        include: { comments: { orderBy: { createdAt: 'asc' } } }, 
+        orderBy: { createdAt: 'desc' }, 
+        take: 50 
+      });
+    } 
+    // 4. Default Feed (New or Hot)
+    else {
+      posts = await prisma.post.findMany({ 
+        include: { comments: { orderBy: { createdAt: 'asc' } } }, 
+        take: 50 
+      });
+
       if (sort === 'hot') {
         posts.sort((a: any, b: any) => {
           const scoreA = (a.comments.length + 1) / Math.pow((Date.now() - new Date(a.createdAt).getTime()) / 3600000 + 2, 1.5);
           const scoreB = (b.comments.length + 1) / Math.pow((Date.now() - new Date(b.createdAt).getTime()) / 3600000 + 2, 1.5);
-          return scoreB
+          return scoreB - scoreA;
+        });
+      } else {
+        posts.sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      }
+    }
+    
+    return NextResponse.json({ posts });
+  } catch (error) { 
+    return NextResponse.json({ error: 'Failed' }, { status: 500 }); 
+  }
+}
+
+export async function POST(request: Request) {
+  try {
+    const body = await request.json();
+    
+    const post = await prisma.post.create({ 
+      data: { 
+        content: body.content || '', 
+        displayName: body.display_name || 'Anonymous', 
+        gifUrl: body.gif_url || null,
+        authorKey: body.authorKey || null 
+      } 
+    });
+    
+    return NextResponse.json(post, { status: 201 });
+  } catch (error) { 
+    return NextResponse.json({ error: 'Failed' }, { status: 500 }); 
+  }
+}
