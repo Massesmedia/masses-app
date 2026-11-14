@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
 type Comment = { id: string; displayName: string; content: string; gifUrl: string | null; createdAt: string };
 type Post = { id: string; displayName: string; content: string; gifUrl: string | null; authorKey: string | null; createdAt: string; comments: Comment[] };
@@ -46,8 +46,9 @@ export default function Home() {
   const [viewingProfile, setViewingProfile] = useState<ProfileData | null>(null);
   const [profileTab, setProfileTab] = useState<'echoes' | 'whispers'>('echoes');
   const [dmTarget, setDmTarget] = useState<ProfileData | null>(null);
-
   const [trendingTags, setTrendingTags] = useState<{tag: string, count: number}[]>([]);
+
+  const chatEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     let key = localStorage.getItem('masses_device_key');
@@ -59,7 +60,6 @@ export default function Home() {
     const savedTab = localStorage.getItem('masses_current_tab');
     if (savedTab) setTabState(savedTab as any);
 
-    // Fetch Trending Tags
     const fetchTrends = async () => {
       const res = await fetch('/api/posts', { method: 'PATCH' });
       const data = await res.json();
@@ -76,6 +76,13 @@ export default function Home() {
       setCanPost(true);
     }
   }, [cooldown]);
+
+  // Auto-scroll to bottom of Inbox
+  useEffect(() => {
+    if (tab === 'inbox' && inboxMessages.length > 0) {
+      chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [inboxMessages, tab]);
 
   const setTab = (newTab: 'feed' | 'search' | 'my-posts' | 'inbox') => {
     setTabState(newTab);
@@ -315,12 +322,12 @@ export default function Home() {
     </div>
 
   ) : tab === 'inbox' ? (
-    <div className="p-4 flex flex-col space-y-4">
+    <div className="p-4 flex flex-col space-y-4 pb-20">
       <div className="flex flex-col space-y-4">
         {inboxMessages.length === 0 ? (
           <div className="text-center text-[#9CA3AF] mt-10">No Whispers yet.</div>
         ) : (
-          inboxMessages.map(msg => {
+          inboxMessages.slice().reverse().map(msg => {
             const isMe = msg.senderKey === deviceKey;
             return (
               <div key={msg.id} className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
@@ -335,6 +342,7 @@ export default function Home() {
             )
           })
         )}
+        <div ref={chatEndRef} />
       </div>
 
       {inboxMessages.length > 0 && (
