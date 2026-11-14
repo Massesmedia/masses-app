@@ -41,7 +41,10 @@ export default function Home() {
   const [inboxMessages, setInboxMessages] = useState<DirectMessage[]>([]);
   const [inboxPosts, setInboxPosts] = useState<Post[]>([]);
   const [dmTexts, setDmTexts] = useState<{ [key: string]: string }>({});
-  const [activeDmPost, setActiveDmPost] = useState<Post | null>(null);
+  
+  // Using a specific ID string for the modal ensures the click registers perfectly on mobile
+  const [dmModalPostId, setDmModalPostId] = useState<string | null>(null);
+  const activeDmPost = posts.find(p => p.id === dmModalPostId) || null;
 
   useEffect(() => {
     let key = localStorage.getItem('masses_device_key');
@@ -95,12 +98,11 @@ export default function Home() {
     setTimeout(() => setCanPost(true), 60000);
   };
 
-  const sendDM = async (post: Post) => {
-    const text = dmTexts[post.id];
-    if (!text?.trim() || !post.authorKey) return;
-    await fetch('/api/inbox', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ postId: post.id, senderKey: deviceKey, receiverKey: post.authorKey, content: text }) });
-    setDmTexts({ ...dmTexts, [post.id]: '' });
-    setActiveDmPost(null);
+  const sendDM = async () => {
+    if (!activeDmPost || !dmTexts[activeDmPost.id]?.trim() || !activeDmPost.authorKey) return;
+    await fetch('/api/inbox', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ postId: activeDmPost.id, senderKey: deviceKey, receiverKey: activeDmPost.authorKey, content: dmTexts[activeDmPost.id] }) });
+    setDmTexts({ ...dmTexts, [activeDmPost.id]: '' });
+    setDmModalPostId(null);
     alert("Message sent anonymously!");
   };
 
@@ -162,7 +164,6 @@ export default function Home() {
               <div className="text-center text-[#A1A1AA] mt-10">No messages yet.</div>
             ) : (
               inboxMessages.map((msg) => {
-                const originalPost = inboxPosts.find(p => p.id === msg.postId);
                 const isMe = msg.senderKey === deviceKey;
                 return (
                   <div key={msg.id} className={`border p-4 rounded-xl ${isMe ? 'bg-[#1A1A1D] border-[#27272A] ml-8' : 'bg-[#121214] border-[#7C3AED]/30 mr-8'}`}>
@@ -198,27 +199,23 @@ export default function Home() {
             return (
               <div key={post.id} className="p-4 border-b border-[#27272A] hover:bg-[#121214]/40 transition-colors flex gap-3">
                 
-                {/* FIXED BUTTON FOR AVATAR */}
-                <button 
-                  onClick={() => { if (!isAuthor && post.authorKey) setActiveDmPost(post); }} 
-                  disabled={isAuthor || !post.authorKey}
+                <div 
+                  onClick={() => { if (!isAuthor && post.authorKey) setDmModalPostId(post.id); }} 
                   className={`w-11 h-11 rounded-full flex-shrink-0 flex items-center justify-center font-bold text-lg text-white bg-gradient-to-br ${avatarGradient} ${!isAuthor && post.authorKey ? 'cursor-pointer hover:opacity-80 active:scale-95' : ''}`}
                 >
                   {initial}
-                </button>
+                </div>
 
                 <div className="flex-1 min-w-0">
-                  {/* FIXED BUTTON FOR NAME */}
-                  <button 
-                    onClick={() => { if (!isAuthor && post.authorKey) setActiveDmPost(post); }}
-                    disabled={isAuthor || !post.authorKey}
-                    className={`flex w-full justify-between text-[13px] text-[#A1A1AA] mb-1 font-medium items-center text-left ${!isAuthor && post.authorKey ? 'cursor-pointer hover:text-white' : ''}`}
+                  <div 
+                    onClick={() => { if (!isAuthor && post.authorKey) setDmModalPostId(post.id); }}
+                    className={`flex justify-between text-[13px] text-[#A1A1AA] mb-1 font-medium items-center ${!isAuthor && post.authorKey ? 'cursor-pointer hover:text-white' : ''}`}
                   >
                     <span className="truncate">
                       {post.displayName} <span className="text-[11px] ml-1 opacity-70">ID:{post.id.slice(0,4)}</span>
                     </span>
                     <span className="flex-shrink-0 ml-2">{new Date(post.createdAt).toLocaleDateString()}</span>
-                  </button>
+                  </div>
 
                   <p className="text-[16px] mb-3 whitespace-pre-wrap leading-relaxed">{post.content}</p>
                   
@@ -256,23 +253,27 @@ export default function Home() {
         })}
       </main>
 
+      {/* FLOATING + BUTTON - ONLY SHOWS ON FEED */}
+      {tab === 'feed' && (
+        <button onClick={() => setIsComposerOpen(true)} className="fixed bottom-20 right-6 w-14 h-14 bg-gradient-to-r from-[#7C3AED] to-[#DB2777] rounded-full flex items-center justify-center shadow-[0_4px_20px_rgba(124,58,237,0.4)] hover:scale-105 active:scale-95 transition-transform z-40">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-6 h-6 text-white"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
+        </button>
+      )}
+
+      {/* DM MODAL (Moved outside the map loop for perfect clicks) */}
       {activeDmPost && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" onClick={() => setActiveDmPost(null)}>
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" onClick={() => setDmModalPostId(null)}>
           <div className="w-full max-w-[400px] bg-[#121214] border border-[#27272A] rounded-2xl p-5 shadow-2xl" onClick={e => e.stopPropagation()}>
             <h3 className="text-white font-bold mb-1">Message {activeDmPost.displayName}</h3>
             <p className="text-xs text-[#A1A1AA] mb-4">This will go directly to their private Inbox.</p>
             <input type="text" placeholder="Type message..." value={dmTexts[activeDmPost.id] || ''} onChange={(e) => setDmTexts({...dmTexts, [activeDmPost.id]: e.target.value})} className="w-full bg-[#050505] border border-[#27272A] rounded-xl p-3 text-sm text-white outline-none focus:border-[#7C3AED] mb-4" autoFocus />
             <div className="flex justify-end gap-3">
-              <button onClick={() => setActiveDmPost(null)} className="text-sm text-[#A1A1AA]">Cancel</button>
-              <button onClick={() => sendDM(activeDmPost)} className="text-sm font-bold bg-[#7C3AED] text-white px-4 py-2 rounded-lg">Send</button>
+              <button onClick={() => setDmModalPostId(null)} className="text-sm text-[#A1A1AA]">Cancel</button>
+              <button onClick={sendDM} className="text-sm font-bold bg-[#7C3AED] text-white px-4 py-2 rounded-lg">Send</button>
             </div>
           </div>
         </div>
       )}
-
-      <button onClick={() => setIsComposerOpen(true)} className="fixed bottom-20 right-6 w-14 h-14 bg-gradient-to-r from-[#7C3AED] to-[#DB2777] rounded-full flex items-center justify-center shadow-[0_4px_20px_rgba(124,58,237,0.4)] hover:scale-105 active:scale-95 transition-transform z-40">
-        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-6 h-6 text-white"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
-      </button>
 
       <nav className="fixed bottom-0 left-0 right-0 max-w-[600px] mx-auto bg-[#050505]/95 backdrop-blur-xl border-t border-[#27272A] flex justify-around items-center h-16 z-50 px-2">
         <button onClick={() => setTab('feed')} className={`flex flex-col items-center justify-center w-full h-full ${tab === 'feed' ? 'text-[#7C3AED]' : 'text-[#A1A1AA] hover:text-white'}`}>
