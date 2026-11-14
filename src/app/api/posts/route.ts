@@ -9,10 +9,11 @@ export async function GET(request: Request) {
   const ids = searchParams.get('ids');
   const authorKey = searchParams.get('authorKey');
 
+  console.log("API HIT - AuthorKey:", authorKey);
+
   try {
     let posts;
     
-    // 1. Fetch by Author Key (for "My Posts" restored from other devices)
     if (authorKey) {
       posts = await prisma.post.findMany({ 
         where: { authorKey: authorKey }, 
@@ -20,7 +21,6 @@ export async function GET(request: Request) {
         orderBy: { createdAt: 'desc' } 
       });
     } 
-    // 2. Fetch specific IDs (for local storage My Posts)
     else if (ids) {
       const idArray = ids.split(',');
       posts = await prisma.post.findMany({ 
@@ -29,7 +29,6 @@ export async function GET(request: Request) {
         orderBy: { createdAt: 'desc' } 
       });
     } 
-    // 3. Search Query
     else if (q) {
       posts = await prisma.post.findMany({ 
         where: { 
@@ -43,7 +42,6 @@ export async function GET(request: Request) {
         take: 50 
       });
     } 
-    // 4. DEFAULT FEED (This was missing in the last update!)
     else {
       posts = await prisma.post.findMany({ 
         include: { comments: { orderBy: { createdAt: 'asc' } } }, 
@@ -63,7 +61,6 @@ export async function GET(request: Request) {
     
     return NextResponse.json({ posts });
   } catch (error) { 
-    console.error(error);
     return NextResponse.json({ error: 'Failed' }, { status: 500 }); 
   }
 }
@@ -81,7 +78,6 @@ export async function POST(request: Request) {
     });
     return NextResponse.json(post, { status: 201 });
   } catch (error) { 
-    console.error(error);
     return NextResponse.json({ error: 'Failed' }, { status: 500 }); 
   }
 }
