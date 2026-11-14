@@ -41,8 +41,6 @@ export default function Home() {
   const [inboxMessages, setInboxMessages] = useState<DirectMessage[]>([]);
   const [inboxPosts, setInboxPosts] = useState<Post[]>([]);
   const [dmTexts, setDmTexts] = useState<{ [key: string]: string }>({});
-  
-  // NEW: State to handle the DM modal
   const [activeDmPost, setActiveDmPost] = useState<Post | null>(null);
 
   useEffect(() => {
@@ -56,24 +54,18 @@ export default function Home() {
 
   useEffect(() => { 
     if (deviceKey) {
-      if (tab === 'inbox') {
-        fetchInbox();
-      } else {
-        fetchPosts(); 
-      }
+      if (tab === 'inbox') fetchInbox();
+      else fetchPosts(); 
     }
   }, [sort, tab, searchQuery, deviceKey]);
 
   const fetchPosts = async () => {
     setIsLoading(true);
     let url = '/api/posts';
-    if (tab === 'my-posts') {
-      url = `/api/posts?authorKey=${deviceKey}`;
-    } else if (tab === 'search' && searchQuery) {
-      url = `/api/posts?q=${encodeURIComponent(searchQuery)}`;
-    } else {
-      url = `/api/posts?sort=${sort}`;
-    }
+    if (tab === 'my-posts') url = `/api/posts?authorKey=${deviceKey}`;
+    else if (tab === 'search' && searchQuery) url = `/api/posts?q=${encodeURIComponent(searchQuery)}`;
+    else url = `/api/posts?sort=${sort}`;
+    
     const res = await fetch(url);
     const data = await res.json();
     setPosts(data.posts || []);
@@ -132,7 +124,7 @@ export default function Home() {
       const cleanKey = input.trim();
       if (cleanKey.startsWith('dk_')) {
         localStorage.setItem('masses_device_key', cleanKey);
-        window.location.reload(); 
+        window.location.href = '/'; 
       } else { alert("Invalid key format."); }
     }
   };
@@ -167,24 +159,28 @@ export default function Home() {
         : tab === 'inbox' ? (
           <div className="p-4 space-y-4">
             {inboxMessages.length === 0 ? (
-              <div className="text-center text-[#A1A1AA] mt-10">No private messages yet.</div>
+              <div className="text-center text-[#A1A1AA] mt-10">No messages yet.</div>
             ) : (
               inboxMessages.map((msg) => {
                 const originalPost = inboxPosts.find(p => p.id === msg.postId);
+                const isMe = msg.senderKey === deviceKey;
                 return (
-                  <div key={msg.id} className="bg-[#121214] border border-[#27272A] p-4 rounded-xl">
-                    <div className="text-xs text-[#A1A1AA] mb-2">
-                      Regarding: <span className="italic text-[#7C3AED]">"{originalPost?.content.slice(0, 30)}..."</span>
+                  <div key={msg.id} className={`border p-4 rounded-xl ${isMe ? 'bg-[#1A1A1D] border-[#27272A] ml-8' : 'bg-[#121214] border-[#7C3AED]/30 mr-8'}`}>
+                    <div className="text-xs text-[#A1A1AA] mb-2 flex justify-between">
+                      <span>{isMe ? 'You sent' : 'Received'}</span>
+                      <span className="italic text-[#7C3AED] cursor-pointer" onClick={() => setTab('feed')}>"{originalPost?.content.slice(0, 20)}..."</span>
                     </div>
-                    <p className="text-sm text-white mb-3">{msg.content}</p>
-                    <div className="flex gap-2">
-                      <input type="text" placeholder="Reply..." onChange={(e) => setDmTexts({...dmTexts, [msg.id]: e.target.value})} className="flex-1 bg-[#050505] border border-[#27272A] rounded-lg p-2 text-sm text-white outline-none focus:border-[#7C3AED]" />
-                      <button onClick={() => {
-                         fetch('/api/inbox', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ postId: msg.postId, senderKey: deviceKey, receiverKey: msg.senderKey, content: dmTexts[msg.id] })});
-                         setDmTexts({...dmTexts, [msg.id]: ''});
-                         alert("Reply sent!");
-                      }} className="text-[#7C3AED] font-bold text-sm px-2">Send</button>
-                    </div>
+                    <p className="text-sm text-white mb-2">{msg.content}</p>
+                    {!isMe && (
+                      <div className="flex gap-2 mt-2">
+                        <input type="text" placeholder="Reply..." onChange={(e) => setDmTexts({...dmTexts, [msg.id]: e.target.value})} className="flex-1 bg-[#050505] border border-[#27272A] rounded-lg p-2 text-sm text-white outline-none focus:border-[#7C3AED]" />
+                        <button onClick={() => {
+                           fetch('/api/inbox', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ postId: msg.postId, senderKey: deviceKey, receiverKey: msg.senderKey, content: dmTexts[msg.id] })});
+                           setDmTexts({...dmTexts, [msg.id]: ''});
+                           fetchInbox();
+                        }} className="text-[#7C3AED] font-bold text-sm px-2">Send</button>
+                      </div>
+                    )}
                   </div>
                 );
               })
@@ -203,7 +199,6 @@ export default function Home() {
             return (
               <div key={post.id} className="p-4 border-b border-[#27272A] hover:bg-[#121214]/40 transition-colors flex gap-3">
                 
-                {/* CLICK AVATAR TO DM */}
                 <div 
                   onClick={() => { if (!isAuthor && post.authorKey) setActiveDmPost(post); }} 
                   className={`w-11 h-11 rounded-full flex-shrink-0 flex items-center justify-center font-bold text-lg text-white bg-gradient-to-br ${avatarGradient} ${!isAuthor && post.authorKey ? 'cursor-pointer hover:opacity-80 active:scale-95' : ''}`}
@@ -212,7 +207,6 @@ export default function Home() {
                 </div>
 
                 <div className="flex-1 min-w-0">
-                  {/* CLICK NAME TO DM */}
                   <div 
                     onClick={() => { if (!isAuthor && post.authorKey) setActiveDmPost(post); }}
                     className={`flex justify-between text-[13px] text-[#A1A1AA] mb-1 font-medium items-center ${!isAuthor && post.authorKey ? 'cursor-pointer hover:text-white' : ''}`}
@@ -230,13 +224,6 @@ export default function Home() {
                       <span className={`text-[10px] transition-transform ${isOpen ? 'rotate-90' : ''}`}>▶</span>
                       {post.comments.length} Replies
                     </button>
-
-                    {!isAuthor && post.authorKey && (
-                      <button onClick={() => setActiveDmPost(post)} className="text-sm font-medium text-[#A1A1AA] hover:text-[#DB2777] transition-colors flex items-center gap-1">
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4"><path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" /></svg>
-                        Message
-                      </button>
-                    )}
                   </div>
 
                   {isOpen && (
@@ -266,20 +253,12 @@ export default function Home() {
         })}
       </main>
 
-      {/* FIXED DM MODAL - SHOWS PROPERLY ON TOP OF EVERYTHING */}
       {activeDmPost && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" onClick={() => setActiveDmPost(null)}>
           <div className="w-full max-w-[400px] bg-[#121214] border border-[#27272A] rounded-2xl p-5 shadow-2xl" onClick={e => e.stopPropagation()}>
             <h3 className="text-white font-bold mb-1">Message {activeDmPost.displayName}</h3>
             <p className="text-xs text-[#A1A1AA] mb-4">This will go directly to their private Inbox.</p>
-            <input 
-              type="text" 
-              placeholder="Type message..." 
-              value={dmTexts[activeDmPost.id] || ''} 
-              onChange={(e) => setDmTexts({...dmTexts, [activeDmPost.id]: e.target.value})} 
-              className="w-full bg-[#050505] border border-[#27272A] rounded-xl p-3 text-sm text-white outline-none focus:border-[#7C3AED] mb-4" 
-              autoFocus
-            />
+            <input type="text" placeholder="Type message..." value={dmTexts[activeDmPost.id] || ''} onChange={(e) => setDmTexts({...dmTexts, [activeDmPost.id]: e.target.value})} className="w-full bg-[#050505] border border-[#27272A] rounded-xl p-3 text-sm text-white outline-none focus:border-[#7C3AED] mb-4" autoFocus />
             <div className="flex justify-end gap-3">
               <button onClick={() => setActiveDmPost(null)} className="text-sm text-[#A1A1AA]">Cancel</button>
               <button onClick={() => sendDM(activeDmPost)} className="text-sm font-bold bg-[#7C3AED] text-white px-4 py-2 rounded-lg">Send</button>
