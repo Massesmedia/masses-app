@@ -30,7 +30,6 @@ export default function Home() {
   const [displayName, setDisplayName] = useState('');
   const [sort, setSort] = useState<'new' | 'hot'>('new');
   
-  // FIX 1: Read the saved tab from local storage on initial load
   const [tab, setTabState] = useState<'feed' | 'search' | 'my-posts' | 'inbox'>('feed');
   
   const [searchQuery, setSearchQuery] = useState('');
@@ -48,7 +47,6 @@ export default function Home() {
   
   const activeDmPost = posts.find(p => p.id === dmModalPostId) || null;
 
-  // FIX 1 continued: Load key and saved tab
   useEffect(() => {
     let key = localStorage.getItem('masses_device_key');
     if (!key) {
@@ -58,12 +56,9 @@ export default function Home() {
     setDeviceKey(key);
 
     const savedTab = localStorage.getItem('masses_current_tab');
-    if (savedTab) {
-      setTabState(savedTab as any);
-    }
+    if (savedTab) setTabState(savedTab as any);
   }, []);
 
-  // FIX 1 continued: Create a wrapper function to save the tab when clicked
   const setTab = (newTab: 'feed' | 'search' | 'my-posts' | 'inbox') => {
     setTabState(newTab);
     localStorage.setItem('masses_current_tab', newTab);
@@ -211,28 +206,30 @@ export default function Home() {
             const initial = post.displayName.charAt(0).toUpperCase();
 
             return (
-              <div key={post.id} className="p-4 border-b border-[#27272A] hover:bg-[#121214]/40 transition-colors flex gap-3 relative z-0">
+              <div key={post.id} className="p-4 border-b border-[#27272A] hover:bg-[#121214]/40 transition-colors flex gap-3">
                 
-                {/* FIX 2: Wrapped the whole top area in a clickable button and added touch-action */}
-                <button 
+                {/* BULLETPROOF CLICKABLE AVATAR - Using native button */}
+                <div 
                   onClick={() => { if (!isAuthor && post.authorKey) setDmModalPostId(post.id); }} 
-                  style={{ touchAction: 'manipulation' }}
-                  className={`flex items-start gap-3 w-full text-left bg-transparent border-none p-0 outline-none ${!isAuthor && post.authorKey ? 'cursor-pointer' : ''}`}
+                  className={`w-11 h-11 rounded-full flex-shrink-0 flex items-center justify-center font-bold text-lg text-white bg-gradient-to-br ${avatarGradient} ${!isAuthor && post.authorKey ? 'cursor-pointer hover:opacity-80 active:scale-95' : ''}`}
+                  style={{ WebkitTapHighlightColor: 'transparent', touchAction: 'manipulation' }}
                 >
-                  <div className={`w-11 h-11 rounded-full flex-shrink-0 flex items-center justify-center font-bold text-lg text-white bg-gradient-to-br ${avatarGradient}`}>
-                    {initial}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex justify-between text-[13px] text-[#A1A1AA] mb-1 font-medium items-center w-full">
-                      <span className="truncate">
-                        {post.displayName} <span className="text-[11px] ml-1 opacity-70">ID:{post.id.slice(0,4)}</span>
-                      </span>
-                      <span className="flex-shrink-0 ml-2">{new Date(post.createdAt).toLocaleDateString()}</span>
-                    </div>
-                  </div>
-                </button>
+                  {initial}
+                </div>
 
-                <div className="flex-1 min-w-0 pt-8 -ml-14 pl-14">
+                <div className="flex-1 min-w-0">
+                  {/* BULLETPROOF CLICKABLE NAME */}
+                  <div 
+                    onClick={() => { if (!isAuthor && post.authorKey) setDmModalPostId(post.id); }}
+                    className={`flex justify-between text-[13px] text-[#A1A1AA] mb-1 font-medium items-center ${!isAuthor && post.authorKey ? 'cursor-pointer hover:text-white' : ''}`}
+                    style={{ WebkitTapHighlightColor: 'transparent', touchAction: 'manipulation' }}
+                  >
+                    <span className="truncate">
+                      {post.displayName} <span className="text-[11px] ml-1 opacity-70">ID:{post.id.slice(0,4)}</span>
+                    </span>
+                    <span className="flex-shrink-0 ml-2">{new Date(post.createdAt).toLocaleDateString()}</span>
+                  </div>
+
                   <p className="text-[16px] mb-3 whitespace-pre-wrap leading-relaxed">{post.content}</p>
                   
                   <div className="flex items-center gap-6">
