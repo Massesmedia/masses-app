@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 type Comment = { id: string; displayName: string; content: string; gifUrl: string | null; createdAt: string };
 type Post = { id: string; displayName: string; content: string; gifUrl: string | null; authorKey: string | null; createdAt: string; comments: Comment[] };
 type DirectMessage = { id: string; postId: string; senderKey: string; receiverKey: string; content: string; createdAt: string };
+type ProfileData = { name: string; posts: Post[]; replies: Comment[]; authorKey: string };
 
 const Logo = ({ className }: { className?: string }) => (
   <svg xmlns="http://www.w3.org/2000/svg" className={className} viewBox="0 0 1024 1024">
@@ -29,9 +30,7 @@ export default function Home() {
   const [content, setContent] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [sort, setSort] = useState<'new' | 'hot'>('new');
-  
   const [tab, setTabState] = useState<'feed' | 'search' | 'my-posts' | 'inbox'>('feed');
-  
   const [searchQuery, setSearchQuery] = useState('');
   const [openThreads, setOpenThreads] = useState<Set<string>>(new Set());
   const [replyTexts, setReplyTexts] = useState<{ [key: string]: string }>({});
@@ -43,9 +42,12 @@ export default function Home() {
   const [inboxMessages, setInboxMessages] = useState<DirectMessage[]>([]);
   const [inboxPosts, setInboxPosts] = useState<Post[]>([]);
   const [dmTexts, setDmTexts] = useState<{ [key: string]: string }>({});
-  const [dmModalPostId, setDmModalPostId] = useState<string | null>(null);
   
-  const activeDmPost = posts.find(p => p.id === dmModalPostId) || null;
+  const [viewingProfile, setViewingProfile] = useState<ProfileData | null>(null);
+  const [profileTab, setProfileTab] = useState<'echoes' | 'whispers'>('echoes');
+  
+  // DM State (Triggered ONLY from Profile)
+  const [dmTarget, setDmTarget] = useState<ProfileData | null>(null);
 
   useEffect(() => {
     let key = localStorage.getItem('masses_device_key');
@@ -54,22 +56,22 @@ export default function Home() {
       localStorage.setItem('masses_device_key', key);
     }
     setDeviceKey(key);
-
     const savedTab = localStorage.getItem('masses_current_tab');
     if (savedTab) setTabState(savedTab as any);
   }, []);
 
   const setTab = (newTab: 'feed' | 'search' | 'my-posts' | 'inbox') => {
     setTabState(newTab);
+    setViewingProfile(null);
     localStorage.setItem('masses_current_tab', newTab);
   };
 
   useEffect(() => { 
-    if (deviceKey) {
+    if (deviceKey && !viewingProfile) {
       if (tab === 'inbox') fetchInbox();
       else fetchPosts(); 
     }
-  }, [sort, tab, searchQuery, deviceKey]);
+  }, [sort, tab, searchQuery, deviceKey, viewingProfile]);
 
   const fetchPosts = async () => {
     setIsLoading(true);
@@ -77,7 +79,6 @@ export default function Home() {
     if (tab === 'my-posts') url = `/api/posts?authorKey=${deviceKey}`;
     else if (tab === 'search' && searchQuery) url = `/api/posts?q=${encodeURIComponent(searchQuery)}`;
     else url = `/api/posts?sort=${sort}`;
-    
     const res = await fetch(url);
     const data = await res.json();
     setPosts(data.posts || []);
@@ -91,6 +92,18 @@ export default function Home() {
     setInboxMessages(data.messages || []);
     setInboxPosts(data.posts || []);
     setIsLoading(false);
+  };
+
+  const openProfile = (name: string, authorKey: string) => {
+    const userPosts = posts.filter(p => p.displayName === name);
+    const userReplies: Comment[] = [];
+    posts.forEach(p => {
+      p.comments.forEach(c => {
+        if (c.displayName === name) userReplies.push(c);
+      });
+    });
+    setViewingProfile({ name, posts: userPosts, replies: userReplies, authorKey });
+    setProfileTab('echoes');
   };
 
   const submitPost = async () => {
@@ -108,11 +121,11 @@ export default function Home() {
   };
 
   const sendDM = async () => {
-    if (!activeDmPost || !dmTexts[activeDmPost.id]?.trim() || !activeDmPost.authorKey) return;
-    await fetch('/api/inbox', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ postId: activeDmPost.id, senderKey: deviceKey, receiverKey: activeDmPost.authorKey, content: dmTexts[activeDmPost.id] }) });
-    setDmTexts({ ...dmTexts, [activeDmPost.id]: '' });
-    setDmModalPostId(null);
-    alert("Message sent anonymously!");
+    if (!dmTarget || !dmTexts[dmTarget.name]?.trim()) return;
+    await fetch('/api/inbox', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ postId: 'direct', senderKey: deviceKey, receiverKey: dmTarget.authorKey, content: dmTexts[dmTarget.name] }) });
+    setDmTexts({ ...dmTexts, [dmTarget.name]: '' });
+    setDmTarget(null);
+    alert("Whisper sent privately!");
   };
 
   const toggleThread = (id: string) => {
@@ -145,148 +158,194 @@ export default function Home() {
       
       <header className="sticky top-0 bg-[#050505]/80 backdrop-blur-xl border-b border-[#27272A] p-4 flex justify-between items-center z-40">
         <div className="flex items-center gap-3">
-          <button onClick={() => setIsMenuOpen(true)} className="text-[#A1A1AA] hover:text-white p-2 -ml-2">
-             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-6 h-6"><path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" /></svg>
-          </button>
-          <div className="relative">
-            <Logo className="w-8 h-8 rounded-[10px] relative z-10" />
-            <div className="absolute inset-0 bg-[#7C3AED] blur-md opacity-20 rounded-[10px] z-0"></div>
-          </div>
-          <span className="text-xl font-black tracking-[0.15em] bg-clip-text text-transparent bg-gradient-to-br from-[#7C3AED] to-[#DB2777]">Masses</span>
+          {viewingProfile ? (
+            <button onClick={() => setViewingProfile(null)} className="text-[#A1A1AA] hover:text-white flex items-center gap-2 font-bold">
+              ← Back
+            </button>
+          ) : (
+            <>
+              <button onClick={() => setIsMenuOpen(true)} className="text-[#A1A1AA] hover:text-white p-2 -ml-2">
+                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-6 h-6"><path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" /></svg>
+              </button>
+              <div className="relative">
+                <Logo className="w-8 h-8 rounded-[10px] relative z-10" />
+                <div className="absolute inset-0 bg-[#7C3AED] blur-md opacity-20 rounded-[10px] z-0"></div>
+              </div>
+              <span className="text-xl font-black tracking-[0.15em] bg-clip-text text-transparent bg-gradient-to-br from-[#7C3AED] to-[#DB2777]">Masses</span>
+            </>
+          )}
         </div>
-        {tab === 'feed' && (
+        {tab === 'feed' && !viewingProfile && (
           <button onClick={() => setSort(sort === 'new' ? 'hot' : 'new')} className="text-xs font-semibold text-[#A1A1AA] border border-[#27272A] bg-[#121214] px-3 py-1.5 rounded-lg hover:text-white transition-colors">{sort === 'new' ? 'NEW' : 'HOT'}</button>
         )}
       </header>
 
-      {tab === 'search' && (
+      {tab === 'search' && !viewingProfile && (
         <div className="p-4 border-b border-[#27272A]">
-          <input type="text" placeholder="Search names or thoughts..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full bg-[#121214] border border-[#27272A] rounded-xl p-3 text-white outline-none focus:border-[#7C3AED] focus:ring-2 focus:ring-[#7C3AED]/20 transition-all" />
+          <input type="text" placeholder="Search echoes..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full bg-[#121214] border border-[#27272A] rounded-xl p-3 text-white outline-none focus:border-[#7C3AED] focus:ring-2 focus:ring-[#7C3AED]/20 transition-all" />
         </div>
       )}
 
-      <main>        {isLoading ? <div className="p-5 space-y-4">{[1,2,3].map(i => <div key={i} className="animate-pulse border border-[#27272A] p-5 rounded-xl"><div className="h-3 w-24 bg-[#27272A] rounded mb-4"></div><div className="h-4 w-full bg-[#27272A] rounded mb-2"></div><div className="h-4 w-2/3 bg-[#27272A] rounded"></div></div>)}</div> 
+      <main>  {viewingProfile ? (
+    <div className="pb-10">
+      <div className="p-6 border-b border-[#27272A] flex flex-col items-center bg-[#121214]/50">
+        <div className={`w-20 h-20 rounded-full flex items-center justify-center font-bold text-3xl text-white bg-gradient-to-br ${getAvatarGradient(viewingProfile.name)} mb-4 shadow-lg`}>
+          {viewingProfile.name.charAt(0).toUpperCase()}
+        </div>
+        <h2 className="text-2xl font-bold text-white mb-1">{viewingProfile.name}</h2>
+        <p className="text-xs text-[#A1A1AA] mb-4">Anonymous Identity</p>
         
-        : tab === 'inbox' ? (
-          <div className="p-4 space-y-4">
-            {inboxMessages.length === 0 ? (
-              <div className="text-center text-[#A1A1AA] mt-10">No messages yet.</div>
-            ) : (
-              inboxMessages.map((msg) => {
-                const isMe = msg.senderKey === deviceKey;
-                return (
-                  <div key={msg.id} className={`border p-4 rounded-xl ${isMe ? 'bg-[#1A1A1D] border-[#27272A] ml-8' : 'bg-[#121214] border-[#7C3AED]/30 mr-8'}`}>
-                    <div className="text-xs text-[#A1A1AA] mb-2 flex justify-between">
-                      <span>{isMe ? 'You sent' : 'Received'}</span>
-                    </div>
-                    <p className="text-sm text-white mb-2">{msg.content}</p>
-                    {!isMe && (
-                      <div className="flex gap-2 mt-2">
-                        <input type="text" placeholder="Reply..." onChange={(e) => setDmTexts({...dmTexts, [msg.id]: e.target.value})} className="flex-1 bg-[#050505] border border-[#27272A] rounded-lg p-2 text-sm text-white outline-none focus:border-[#7C3AED]" />
-                        <button onClick={() => {
-                           fetch('/api/inbox', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ postId: msg.postId, senderKey: deviceKey, receiverKey: msg.senderKey, content: dmTexts[msg.id] })});
-                           setDmTexts({...dmTexts, [msg.id]: ''});
-                           fetchInbox();
-                        }} className="text-[#7C3AED] font-bold text-sm px-2">Send</button>
-                      </div>
-                    )}
-                  </div>
-                );
-              })
-            )}
-          </div>
-        )
+        {viewingProfile.authorKey !== deviceKey && viewingProfile.authorKey !== 'unknown' ? (
+          <button onClick={() => setDmTarget(viewingProfile)} className="px-6 py-2 bg-gradient-to-r from-[#7C3AED] to-[#DB2777] text-white font-bold rounded-full shadow-lg hover:opacity-90 active:scale-95 transition-all flex items-center gap-2">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" /></svg>
+            Message
+          </button>
+        ) : (
+          <span className="px-4 py-1 bg-[#27272A] text-[#A1A1AA] text-xs font-bold rounded-full">This is You</span>
+        )}
+      </div>
 
-        : posts.length === 0 ? <div className="flex flex-col items-center justify-center p-20 text-center mt-10"><Logo className="w-20 h-20 mb-6 opacity-50" /><p className="text-[#A1A1AA] text-sm">No thoughts found. Be the first voice.</p></div>
-        
-        : posts.map((post) => {
-            const isOpen = openThreads.has(post.id);
-            const isAuthor = post.authorKey === deviceKey;
-            const avatarGradient = getAvatarGradient(post.displayName);
-            const initial = post.displayName.charAt(0).toUpperCase();
+      <div className="flex border-b border-[#27272A] bg-[#050505]">
+        <button onClick={() => setProfileTab('echoes')} className={`flex-1 py-3 text-sm font-bold border-b-2 transition-all ${profileTab === 'echoes' ? 'text-[#7C3AED] border-[#7C3AED]' : 'text-[#A1A1AA] border-transparent'}`}>Echoes ({viewingProfile.posts.length})</button>
+        <button onClick={() => setProfileTab('whispers')} className={`flex-1 py-3 text-sm font-bold border-b-2 transition-all ${profileTab === 'whispers' ? 'text-[#7C3AED] border-[#7C3AED]' : 'text-[#A1A1AA] border-transparent'}`}>Whispers ({viewingProfile.replies.length})</button>
+      </div>
 
-            return (
-              <div key={post.id} className="p-4 border-b border-[#27272A] hover:bg-[#121214]/40 transition-colors flex gap-3">
-                
-                {/* BULLETPROOF CLICKABLE AVATAR - Using native button */}
-                <div 
-                  onClick={() => { if (!isAuthor && post.authorKey) setDmModalPostId(post.id); }} 
-                  className={`w-11 h-11 rounded-full flex-shrink-0 flex items-center justify-center font-bold text-lg text-white bg-gradient-to-br ${avatarGradient} ${!isAuthor && post.authorKey ? 'cursor-pointer hover:opacity-80 active:scale-95' : ''}`}
-                  style={{ WebkitTapHighlightColor: 'transparent', touchAction: 'manipulation' }}
-                >
-                  {initial}
+      <div className="p-4 space-y-4">
+        {profileTab === 'echoes' && (
+          viewingProfile.posts.length === 0 ? <p className="text-center text-[#A1A1AA] mt-10">No Echoes yet.</p> :
+          viewingProfile.posts.map(p => (
+            <div key={p.id} className="p-4 bg-[#121214] border border-[#27272A] rounded-xl">
+              <p className="text-[15px] mb-2">{p.content}</p>
+              <span className="text-xs text-[#A1A1AA]">{new Date(p.createdAt).toLocaleDateString()}</span>
+            </div>
+          ))
+        )}
+        {profileTab === 'whispers' && (
+          viewingProfile.replies.length === 0 ? <p className="text-center text-[#A1A1AA] mt-10">No Whispers yet.</p> :
+          viewingProfile.replies.map((r, i) => (
+            <div key={i} className="p-4 bg-[#121214] border border-[#27272A] rounded-xl">
+              <p className="text-[15px] mb-2">"{r.content}"</p>
+              <span className="text-xs text-[#A1A1AA]">{new Date(r.createdAt).toLocaleDateString()}</span>
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+
+  ) : isLoading ? (
+    <div className="p-5 space-y-4">{[1,2,3].map(i => <div key={i} className="animate-pulse border border-[#27272A] p-5 rounded-xl"><div className="h-3 w-24 bg-[#27272A] rounded mb-4"></div><div className="h-4 w-full bg-[#27272A] rounded mb-2"></div><div className="h-4 w-2/3 bg-[#27272A] rounded"></div></div>)}</div> 
+  )
+  
+  : tab === 'inbox' ? (
+    <div className="p-4 space-y-4">
+      {inboxMessages.length === 0 ? (
+        <div className="text-center text-[#A1A1AA] mt-10">Your Whisper Inbox is empty.</div>
+      ) : (
+        inboxMessages.map((msg) => {
+          const isMe = msg.senderKey === deviceKey;
+          return (
+            <div key={msg.id} className={`border p-4 rounded-xl ${isMe ? 'bg-[#1A1A1D] border-[#27272A] ml-8' : 'bg-[#121214] border-[#7C3AED]/30 mr-8'}`}>
+              <div className="text-xs text-[#A1A1AA] mb-2 flex justify-between">
+                <span>{isMe ? 'You whispered' : 'Whisper received'}</span>
+              </div>
+              <p className="text-sm text-white mb-2">{msg.content}</p>
+              {!isMe && (
+                <div className="flex gap-2 mt-2">
+                  <input type="text" placeholder="Whisper back..." onChange={(e) => setDmTexts({...dmTexts, [msg.id]: e.target.value})} className="flex-1 bg-[#050505] border border-[#27272A] rounded-lg p-2 text-sm text-white outline-none focus:border-[#7C3AED]" />
+                  <button onClick={() => {
+                     fetch('/api/inbox', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ postId: msg.postId, senderKey: deviceKey, receiverKey: msg.senderKey, content: dmTexts[msg.id] })});
+                     setDmTexts({...dmTexts, [msg.id]: ''});
+                     fetchInbox();
+                  }} className="text-[#7C3AED] font-bold text-sm px-2">Send</button>
                 </div>
+              )}
+            </div>
+          );
+        })
+      )}
+    </div>
+  )
 
-                <div className="flex-1 min-w-0">
-                  {/* BULLETPROOF CLICKABLE NAME */}
-                  <div 
-                    onClick={() => { if (!isAuthor && post.authorKey) setDmModalPostId(post.id); }}
-                    className={`flex justify-between text-[13px] text-[#A1A1AA] mb-1 font-medium items-center ${!isAuthor && post.authorKey ? 'cursor-pointer hover:text-white' : ''}`}
-                    style={{ WebkitTapHighlightColor: 'transparent', touchAction: 'manipulation' }}
-                  >
-                    <span className="truncate">
-                      {post.displayName} <span className="text-[11px] ml-1 opacity-70">ID:{post.id.slice(0,4)}</span>
-                    </span>
-                    <span className="flex-shrink-0 ml-2">{new Date(post.createdAt).toLocaleDateString()}</span>
-                  </div>
+  : posts.length === 0 ? <div className="flex flex-col items-center justify-center p-20 text-center mt-10"><Logo className="w-20 h-20 mb-6 opacity-50" /><p className="text-[#A1A1AA] text-sm">No echoes found. Be the first voice.</p></div>
+  
+  : posts.map((post) => {
+      const isOpen = openThreads.has(post.id);
+      const avatarGradient = getAvatarGradient(post.displayName);
+      const initial = post.displayName.charAt(0).toUpperCase();
 
-                  <p className="text-[16px] mb-3 whitespace-pre-wrap leading-relaxed">{post.content}</p>
-                  
-                  <div className="flex items-center gap-6">
-                    <button onClick={() => toggleThread(post.id)} className={`flex items-center gap-2 text-sm font-medium transition-colors ${isOpen ? 'text-[#7C3AED]' : 'text-[#A1A1AA] hover:text-[#7C3AED]'}`}>
-                      <span className={`text-[10px] transition-transform ${isOpen ? 'rotate-90' : ''}`}>▶</span>
-                      {post.comments.length} Replies
-                    </button>
-                  </div>
+      return (
+        <div key={post.id} className="p-4 border-b border-[#27272A] hover:bg-[#121214]/40 transition-colors flex gap-3">
+          
+          {/* AVATAR CLICK - GO TO PROFILE */}
+          <div onClick={() => openProfile(post.displayName, post.authorKey || 'unknown')} className={`w-11 h-11 rounded-full flex-shrink-0 flex items-center justify-center font-bold text-lg text-white bg-gradient-to-br ${avatarGradient} cursor-pointer hover:opacity-80`}>
+            {initial}
+          </div>
 
-                  {isOpen && (
-                    <div className="mt-4 space-y-3">
-                      {post.comments.map(c => {
-                        const cGradient = getAvatarGradient(c.displayName);
-                        return (
-                        <div key={c.id} className="flex gap-2">
-                          <div className={`w-7 h-7 rounded-full flex-shrink-0 flex items-center justify-center font-bold text-xs text-white bg-gradient-to-br ${cGradient}`}>
-                            {c.displayName.charAt(0).toUpperCase()}
-                          </div>
-                          <div className="flex-1 bg-[#121214] p-2 rounded-xl border border-[#27272A]">
-                            <span className="text-xs text-[#A1A1AA] block mb-1 font-semibold">{c.displayName}</span>
-                            <span className="text-[14px]">{c.content}</span>
-                          </div>
-                        </div>
-                      )})}
-                      <div className="flex gap-2 mt-3 pl-9">
-                        <input type="text" placeholder="Reply publicly..." value={replyTexts[post.id] || ''} onChange={(e) => setReplyTexts({ ...replyTexts, [post.id]: e.target.value })} className="flex-1 bg-[#050505] border border-[#27272A] rounded-xl p-3 text-sm outline-none focus:border-[#7C3AED] transition-all text-white" onKeyDown={(e) => e.key === 'Enter' && submitReply(post.id)} />
-                        <button onClick={() => submitReply(post.id)} className="text-sm font-bold px-3 text-[#7C3AED] hover:text-[#9d6bff]">Reply</button>
-                      </div>
+          <div className="flex-1 min-w-0">
+            {/* NAME CLICK - GO TO PROFILE */}
+            <div onClick={() => openProfile(post.displayName, post.authorKey || 'unknown')} className="flex justify-between text-[13px] text-[#A1A1AA] mb-1 font-medium items-center cursor-pointer hover:text-white">
+              <span className="truncate">
+                {post.displayName} <span className="text-[11px] ml-1 opacity-70">ID:{post.id.slice(0,4)}</span>
+              </span>
+              <span className="flex-shrink-0 ml-2">{new Date(post.createdAt).toLocaleDateString()}</span>
+            </div>
+
+            <p className="text-[16px] mb-3 whitespace-pre-wrap leading-relaxed">{post.content}</p>
+            
+            <div className="flex items-center justify-between">
+              <button onClick={() => toggleThread(post.id)} className={`flex items-center gap-2 text-sm font-medium transition-colors ${isOpen ? 'text-[#7C3AED]' : 'text-[#A1A1AA] hover:text-[#7C3AED]'}`}>
+                <span className={`text-[10px] transition-transform ${isOpen ? 'rotate-90' : ''}`}>▶</span>
+                {post.comments.length} Whispers
+              </button>
+            </div>
+
+            {isOpen && (
+              <div className="mt-4 space-y-3">
+                {post.comments.map(c => {
+                  const cGradient = getAvatarGradient(c.displayName);
+                  return (
+                  <div key={c.id} className="flex gap-2">
+                    <div onClick={() => openProfile(c.displayName, 'unknown')} className={`w-7 h-7 rounded-full flex-shrink-0 flex items-center justify-center font-bold text-xs text-white bg-gradient-to-br ${cGradient} cursor-pointer`}>
+                      {c.displayName.charAt(0).toUpperCase()}
                     </div>
-                  )}
+                    <div className="flex-1 bg-[#121214] p-2 rounded-xl border border-[#27272A]">
+                      <span onClick={() => openProfile(c.displayName, 'unknown')} className="text-xs text-[#A1A1AA] block mb-1 font-semibold cursor-pointer hover:text-white">{c.displayName}</span>
+                      <span className="text-[14px]">{c.content}</span>
+                    </div>
+                  </div>
+                )})}
+                <div className="flex gap-2 mt-3 pl-9">
+                  <input type="text" placeholder="Whisper publicly..." value={replyTexts[post.id] || ''} onChange={(e) => setReplyTexts({ ...replyTexts, [post.id]: e.target.value })} className="flex-1 bg-[#050505] border border-[#27272A] rounded-xl p-3 text-sm outline-none focus:border-[#7C3AED] transition-all text-white" onKeyDown={(e) => e.key === 'Enter' && submitReply(post.id)} />
+                  <button onClick={() => submitReply(post.id)} className="text-sm font-bold px-3 text-[#7C3AED] hover:text-[#9d6bff]">Reply</button>
                 </div>
               </div>
-            );
-        })}
-      </main>
-
-      {tab === 'feed' && (
-        <button onClick={() => setIsComposerOpen(true)} className="fixed bottom-20 right-6 w-14 h-14 bg-gradient-to-r from-[#7C3AED] to-[#DB2777] rounded-full flex items-center justify-center shadow-[0_4px_20px_rgba(124,58,237,0.4)] hover:scale-105 active:scale-95 transition-transform z-40">
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-6 h-6 text-white"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
-        </button>
-      )}
-
-      {activeDmPost && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" onClick={() => setDmModalPostId(null)}>
-          <div className="w-full max-w-[400px] bg-[#121214] border border-[#27272A] rounded-2xl p-5 shadow-2xl" onClick={e => e.stopPropagation()}>
-            <h3 className="text-white font-bold mb-1">Message {activeDmPost.displayName}</h3>
-            <p className="text-xs text-[#A1A1AA] mb-4">This will go directly to their private Inbox.</p>
-            <input type="text" placeholder="Type message..." value={dmTexts[activeDmPost.id] || ''} onChange={(e) => setDmTexts({...dmTexts, [activeDmPost.id]: e.target.value})} className="w-full bg-[#050505] border border-[#27272A] rounded-xl p-3 text-sm text-white outline-none focus:border-[#7C3AED] mb-4" autoFocus />
-            <div className="flex justify-end gap-3">
-              <button onClick={() => setDmModalPostId(null)} className="text-sm text-[#A1A1AA]">Cancel</button>
-              <button onClick={sendDM} className="text-sm font-bold bg-[#7C3AED] text-white px-4 py-2 rounded-lg">Send</button>
-            </div>
+            )}
           </div>
         </div>
-      )}
+      );
+  })}
+</main>
 
-      <nav className="fixed bottom-0 left-0 right-0 max-w-[600px] mx-auto bg-[#050505]/95 backdrop-blur-xl border-t border-[#27272A] flex justify-around items-center h-16 z-50 px-2">
+{tab === 'feed' && !viewingProfile && (
+  <button onClick={() => setIsComposerOpen(true)} className="fixed bottom-20 right-6 w-14 h-14 bg-gradient-to-r from-[#7C3AED] to-[#DB2777] rounded-full flex items-center justify-center shadow-[0_4px_20px_rgba(124,58,237,0.4)] hover:scale-105 active:scale-95 transition-transform z-40">
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-6 h-6 text-white"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
+  </button>
+)}
+
+{/* DM MODAL */}
+{dmTarget && (
+  <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" onClick={() => setDmTarget(null)}>
+    <div className="w-full max-w-[400px] bg-[#121214] border border-[#27272A] rounded-2xl p-5 shadow-2xl" onClick={e => e.stopPropagation()}>
+      <h3 className="text-white font-bold mb-1">Message {dmTarget.name}</h3>
+      <p className="text-xs text-[#A1A1AA] mb-4">This will be sent privately to their Inbox.</p>
+      <input type="text" placeholder="Type your whisper..." value={dmTexts[dmTarget.name] || ''} onChange={(e) => setDmTexts({...dmTexts, [dmTarget.name]: e.target.value})} className="w-full bg-[#050505] border border-[#27272A] rounded-xl p-3 text-sm text-white outline-none focus:border-[#7C3AED] mb-4" autoFocus />
+      <div className="flex justify-end gap-3">
+        <button onClick={() => setDmTarget(null)} className="text-sm text-[#A1A1AA]">Cancel</button>
+        <button onClick={sendDM} className="text-sm font-bold bg-[#7C3AED] text-white px-4 py-2 rounded-lg">Send</button>
+      </div>
+    </div>
+  </div>
+)}      <nav className="fixed bottom-0 left-0 right-0 max-w-[600px] mx-auto bg-[#050505]/95 backdrop-blur-xl border-t border-[#27272A] flex justify-around items-center h-16 z-50 px-2">
         <button onClick={() => setTab('feed')} className={`flex flex-col items-center justify-center w-full h-full ${tab === 'feed' ? 'text-[#7C3AED]' : 'text-[#A1A1AA] hover:text-white'}`}>
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-7 h-7"><path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12l8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25" /></svg>
         </button>
@@ -329,7 +388,7 @@ export default function Home() {
         <div className="fixed inset-0 z-[100] flex items-end justify-center bg-black/60 backdrop-blur-sm" onClick={() => setIsComposerOpen(false)}>
           <div className="w-full max-w-[600px] bg-[#121214] border-t border-[#27272A] rounded-t-3xl p-6 shadow-2xl animate-[slideUp_0.3s_ease-out]" onClick={(e) => e.stopPropagation()}>
             <div className="flex justify-between items-center mb-4">
-              <span className="text-sm font-bold text-[#A1A1AA]">New Thought</span>
+              <span className="text-sm font-bold text-[#A1A1AA]">New Echo</span>
               <button onClick={() => setIsComposerOpen(false)} className="text-[#A1A1AA] hover:text-white">✕</button>
             </div>
             <input type="text" placeholder="Anonymous (Optional Name)" maxLength={28} value={displayName} onChange={(e) => setDisplayName(e.target.value)} className="w-full bg-transparent border-b border-[#27272A] pb-3 mb-4 text-sm text-[#A1A1AA] outline-none" />
