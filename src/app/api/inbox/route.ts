@@ -2,7 +2,6 @@ import { NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
 const prisma = new PrismaClient();
 
-// GET: Fetch messages for a specific device key
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const key = searchParams.get('key');
@@ -10,26 +9,35 @@ export async function GET(request: Request) {
   if (!key) return NextResponse.json({ error: 'Key required' }, { status: 400 });
 
   try {
-    const messages = await prisma.directMessage.findMany({
+    // 1. Get messages where I am the receiver (Inbox)
+    const received = await prisma.directMessage.findMany({
       where: { receiverKey: key },
       orderBy: { createdAt: 'desc' },
     });
-    // Also get the posts these messages belong to, so we can show context
-    const postIds = messages.map(m => m.postId);
-    const posts = await prisma.post.findMany({
-      where: { id: { in: postIds } }
+
+    // 2. Get messages where I am the sender (Sent)
+    const sent = await prisma.directMessage.findMany({
+      where: { senderKey: key },
+      orderBy: { createdAt: 'desc' },
     });
 
-    return NextResponse.json({ messages, posts });
+    // Combine them so the user sees the full conversation
+    const allMessages = [...received, ...sent].sort((a, b) => 
+      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
+
+    return NextResponse.json({ messages: allMessages });
   } catch (error) {
+    console.error("INBOX API ERROR:", error);
     return NextResponse.json({ error: 'Failed to fetch inbox' }, { status: 500 });
   }
 }
 
-// POST: Send a new message
 export async function POST(request: Request) {
   try {
     const body = await request.json();
+    
+    // We generate a real UUID for the message so it links properly
     const message = await prisma.directMessage.create({
       data: {
         postId: body.postId,
@@ -40,6 +48,7 @@ export async function POST(request: Request) {
     });
     return NextResponse.json(message, { status: 201 });
   } catch (error) {
+    console.error("INBOX POST ERROR:", error);
     return NextResponse.json({ error: 'Failed to send message' }, { status: 500 });
   }
 }
