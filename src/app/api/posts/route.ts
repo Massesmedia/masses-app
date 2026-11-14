@@ -9,11 +9,10 @@ export async function GET(request: Request) {
   const ids = searchParams.get('ids');
   const authorKey = searchParams.get('authorKey');
 
-  console.log("API HIT - AuthorKey:", authorKey);
-
   try {
     let posts;
     
+    // 1. Fetch by Author Key (for "My Posts" restored from other devices)
     if (authorKey) {
       posts = await prisma.post.findMany({ 
         where: { authorKey: authorKey }, 
@@ -21,6 +20,7 @@ export async function GET(request: Request) {
         orderBy: { createdAt: 'desc' } 
       });
     } 
+    // 2. Fetch specific IDs (for local storage My Posts)
     else if (ids) {
       const idArray = ids.split(',');
       posts = await prisma.post.findMany({ 
@@ -29,12 +29,14 @@ export async function GET(request: Request) {
         orderBy: { createdAt: 'desc' } 
       });
     } 
+    // 3. Search Query (This handles the hashtag search)
     else if (q) {
+      const cleanQuery = q.replace('#', ''); // Remove # so "life" searches for "life"
       posts = await prisma.post.findMany({ 
         where: { 
           OR: [
-            { content: { contains: q, mode: 'insensitive' } }, 
-            { displayName: { contains: q, mode: 'insensitive' } }
+            { content: { contains: cleanQuery, mode: 'insensitive' } }, 
+            { displayName: { contains: cleanQuery, mode: 'insensitive' } }
           ] 
         }, 
         include: { comments: { orderBy: { createdAt: 'asc' } } }, 
@@ -42,6 +44,7 @@ export async function GET(request: Request) {
         take: 50 
       });
     } 
+    // 4. Default Feed (New or Hot)
     else {
       posts = await prisma.post.findMany({ 
         include: { comments: { orderBy: { createdAt: 'asc' } } }, 
@@ -61,13 +64,14 @@ export async function GET(request: Request) {
     
     return NextResponse.json({ posts });
   } catch (error) { 
-    return NextResponse.json({ error: 'Failed' }, { status: 500 }); 
+    return NextResponse.json({ error: 'Failed to fetch posts' }, { status: 500 }); 
   }
 }
 
 export async function POST(request: Request) {
   try {
     const body = await request.json();
+    
     const post = await prisma.post.create({ 
       data: { 
         content: body.content || '', 
@@ -76,8 +80,52 @@ export async function POST(request: Request) {
         authorKey: body.authorKey || null 
       } 
     });
+    
     return NextResponse.json(post, { status: 201 });
   } catch (error) { 
-    return NextResponse.json({ error: 'Failed' }, { status: 500 }); 
+    return NextResponse.json({ error: 'Failed to create post' }, { status: 500 }); 
+  }
+}
+
+// PATCH: Calculate Trending Topics
+export async function PATCH(request: Request) {
+  try {
+    // Get all posts from the last 48 hours to keep trends fresh
+    const twoDaysAgo = new Date(Date.now() - 48 * 60 * 60 * 1000);
+    
+    const posts = await prisma.post.findMany({
+      where: { createdAt: { gte: twoDaysAgo } },
+      include: { comments: true }
+    });
+
+    const tagCounts: { [key: string]: number } = {};
+
+    posts.forEach(post => {
+      // Find all words starting with #
+      const tags = post.content.match(/#[a-zA-Z0-9_]+/g);
+      if (tags) {
+        tags.forEach(tag => {
+          const cleanTag = tag.toLowerCase();
+          // Weight the tag: 1 for the post + 1 for every reply it got
+          const weight = 1 + post.comments.length;
+          
+          if (tagCounts[cleanTag]) {
+            tagCounts[cleanTag] += weight;
+          } else {
+            tagCounts[cleanTag] = weight;
+          }
+        });
+      }
+    });
+
+    // Convert to array, sort by weight, and take the top 6
+    const trending = Object.entries(tagCounts)
+      .map(([tag, count]) => ({ tag, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 6);
+
+    return NextResponse.json({ trending });
+  } catch (error) {
+    return NextResponse.json({ error: 'Failed to calculate trends' }, { status: 500 });
   }
 }
