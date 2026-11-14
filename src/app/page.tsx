@@ -27,6 +27,9 @@ export default function Home() {
   const [replyTexts, setReplyTexts] = useState<{ [key: string]: string }>({});
   const [canPost, setCanPost] = useState(true);
 
+  // New state for the Bottom Sheet
+  const [isComposerOpen, setIsComposerOpen] = useState(false);
+
   useEffect(() => { fetchPosts(); }, [sort, tab, searchQuery]);
 
   const fetchPosts = async () => {
@@ -56,7 +59,8 @@ export default function Home() {
       const currentIds = JSON.parse(localStorage.getItem('masses_my_posts') || '[]');
       localStorage.setItem('masses_my_posts', JSON.stringify([...currentIds, newPost.id]));
     }
-    setContent(''); setDisplayName(''); fetchPosts();
+    setContent(''); setDisplayName(''); setIsComposerOpen(false); // Close the modal
+    fetchPosts();
     setTimeout(() => setCanPost(true), 60000);
   };
 
@@ -75,9 +79,9 @@ export default function Home() {
   };
 
   return (
-    <div className="max-w-[600px] mx-auto min-h-screen border-x border-[#27272A] pb-20 bg-[#050505] text-[#F4F4F5] font-sans" style={{ background: 'radial-gradient(circle at top, #111 0%, #050505 40%)' }}>
+    <div className="max-w-[600px] mx-auto min-h-screen border-x border-[#27272A] pb-20 bg-[#050505] text-[#F4F4F5] font-sans relative" style={{ background: 'radial-gradient(circle at top, #111 0%, #050505 40%)' }}>
       
-      <header className="sticky top-0 bg-[#050505]/80 backdrop-blur-xl border-b border-[#27272A] p-4 flex justify-between items-center z-50">
+      <header className="sticky top-0 bg-[#050505]/80 backdrop-blur-xl border-b border-[#27272A] p-4 flex justify-between items-center z-40">
         <div className="flex items-center gap-3">
           <div className="relative">
             <Logo className="w-8 h-8 rounded-[10px] relative z-10" />
@@ -88,7 +92,7 @@ export default function Home() {
         <button onClick={() => setSort(sort === 'new' ? 'hot' : 'new')} className="text-xs font-semibold text-[#A1A1AA] border border-[#27272A] bg-[#121214] px-3 py-1.5 rounded-lg hover:text-white transition-colors">{sort === 'new' ? 'NEW' : 'HOT'}</button>
       </header>
 
-      <div className="flex border-b border-[#27272A] bg-[#121214]/50">
+      <div className="flex border-b border-[#27272A] bg-[#121214]/50 sticky top-[69px] z-30 backdrop-blur-md">
         {(['feed', 'search', 'my-posts'] as const).map((t) => (
           <button key={t} onClick={() => setTab(t)} className={`flex-1 p-4 text-sm font-semibold capitalize relative transition-colors ${tab === t ? 'text-white' : 'text-[#A1A1AA] hover:text-white'}`}>
             {t.replace('-', ' ')}
@@ -103,20 +107,9 @@ export default function Home() {
         </div>
       )}
 
-      {tab === 'feed' && (
-        <div className="m-4 p-5 rounded-2xl border border-[#27272A] bg-[#121214] shadow-2xl">
-          <input type="text" placeholder="Anonymous (Optional Name)" maxLength={28} value={displayName} onChange={(e) => setDisplayName(e.target.value)} className="w-full bg-transparent border-b border-[#27272A] pb-2 mb-3 text-xs text-[#A1A1AA] outline-none" />
-          <textarea value={content} onChange={(e) => setContent(e.target.value)} placeholder="What is on your mind?" className="w-full bg-transparent outline-none resize-none text-lg text-white placeholder-[#52525B]" rows={2} />
-          <div className="flex justify-between items-center mt-4 pt-4 border-t border-[#27272A]">
-            <span className="text-[13px] text-[#52525B] font-medium">Anonymous</span>
-            <button onClick={submitPost} disabled={!content.trim() || !canPost} className="bg-gradient-to-r from-[#7C3AED] to-[#DB2777] text-white font-bold py-2 px-6 rounded-full disabled:opacity-50 hover:opacity-90 transition-opacity shadow-[0_4px_15px_rgba(124,58,237,0.15)]">{canPost ? 'Post' : 'Wait 60s'}</button>
-          </div>
-        </div>
-      )}
-
       <main>
         {isLoading ? <div className="p-5 space-y-4">{[1,2,3].map(i => <div key={i} className="animate-pulse border border-[#27272A] p-5 rounded-xl"><div className="h-3 w-24 bg-[#27272A] rounded mb-4"></div><div className="h-4 w-full bg-[#27272A] rounded mb-2"></div><div className="h-4 w-2/3 bg-[#27272A] rounded"></div></div>)}</div> 
-        : posts.length === 0 ? <div className="flex flex-col items-center justify-center p-20 text-center"><Logo className="w-20 h-20 mb-6 opacity-50" /><p className="text-[#A1A1AA] text-sm">No thoughts found. Be the first voice.</p></div>
+        : posts.length === 0 ? <div className="flex flex-col items-center justify-center p-20 text-center mt-10"><Logo className="w-20 h-20 mb-6 opacity-50" /><p className="text-[#A1A1AA] text-sm">No thoughts found. Be the first voice.</p></div>
         : posts.map((post) => {
             const isOpen = openThreads.has(post.id);
             return (
@@ -150,6 +143,66 @@ export default function Home() {
             );
         })}
       </main>
+
+      {/* FLOATING + BUTTON */}
+      <button 
+        onClick={() => setIsComposerOpen(true)}
+        className="fixed bottom-6 right-6 w-14 h-14 bg-gradient-to-r from-[#7C3AED] to-[#DB2777] rounded-full flex items-center justify-center shadow-[0_4px_20px_rgba(124,58,237,0.4)] hover:scale-105 active:scale-95 transition-transform z-40"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-6 h-6 text-white">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+        </svg>
+      </button>
+
+      {/* COMPOSER BOTTOM SHEET */}
+      {isComposerOpen && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 backdrop-blur-sm" onClick={() => setIsComposerOpen(false)}>
+          <div 
+            className="w-full max-w-[600px] bg-[#121214] border-t border-[#27272A] rounded-t-3xl p-6 shadow-2xl animate-[slideUp_0.3s_ease-out]"
+            onClick={(e) => e.stopPropagation()} // Prevent closing when clicking inside
+          >
+            <div className="flex justify-between items-center mb-4">
+              <span className="text-sm font-bold text-[#A1A1AA]">New Thought</span>
+              <button onClick={() => setIsComposerOpen(false)} className="text-[#A1A1AA] hover:text-white">✕</button>
+            </div>
+            
+            <input 
+              type="text" 
+              placeholder="Anonymous (Optional Name)" 
+              maxLength={28} 
+              value={displayName} 
+              onChange={(e) => setDisplayName(e.target.value)} 
+              className="w-full bg-transparent border-b border-[#27272A] pb-3 mb-4 text-sm text-[#A1A1AA] outline-none" 
+            />
+            <textarea 
+              value={content} 
+              onChange={(e) => setContent(e.target.value)} 
+              placeholder="What is on your mind?" 
+              className="w-full bg-transparent outline-none resize-none text-lg text-white placeholder-[#52525B]" 
+              rows={4}
+              autoFocus
+            />
+            
+            <div className="flex justify-between items-center mt-6">
+              <span className="text-xs text-[#52525B]">{content.length}/600</span>
+              <button 
+                onClick={submitPost} 
+                disabled={!content.trim() || !canPost} 
+                className="bg-gradient-to-r from-[#7C3AED] to-[#DB2777] text-white font-bold py-2.5 px-8 rounded-full disabled:opacity-50 hover:opacity-90 transition-opacity"
+              >
+                {canPost ? 'Post' : 'Wait 60s'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <style jsx global>{`
+        @keyframes slideUp {
+          from { transform: translateY(100%); }
+          to { transform: translateY(0); }
+        }
+      `}</style>
     </div>
   );
 }
