@@ -40,12 +40,10 @@ export default function Home() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [deviceKey, setDeviceKey] = useState<string | null>(null);
   const [inboxMessages, setInboxMessages] = useState<DirectMessage[]>([]);
-  const [inboxPosts, setInboxPosts] = useState<Post[]>([]);
   const [dmTexts, setDmTexts] = useState<{ [key: string]: string }>({});
   
   const [viewingProfile, setViewingProfile] = useState<ProfileData | null>(null);
   const [profileTab, setProfileTab] = useState<'echoes' | 'whispers'>('echoes');
-  
   const [dmTarget, setDmTarget] = useState<ProfileData | null>(null);
 
   useEffect(() => {
@@ -89,7 +87,6 @@ export default function Home() {
     const res = await fetch(`/api/inbox?key=${deviceKey}`);
     const data = await res.json();
     setInboxMessages(data.messages || []);
-    setInboxPosts(data.posts || []);
     setIsLoading(false);
   };
 
@@ -101,15 +98,8 @@ export default function Home() {
         if (c.displayName === name) userReplies.push(c);
       });
     });
-    // Check if this profile belongs to you based on posts OR key
     const isMe = userPosts.some(p => p.authorKey === deviceKey) || authorKey === deviceKey;
-    
-    setViewingProfile({ 
-      name, 
-      posts: userPosts, 
-      replies: userReplies, 
-      authorKey: isMe ? (deviceKey || 'me') : authorKey 
-    });
+    setViewingProfile({ name, posts: userPosts, replies: userReplies, authorKey: isMe ? (deviceKey || 'me') : authorKey });
     setProfileTab('echoes');
   };
 
@@ -129,16 +119,21 @@ export default function Home() {
 
   const sendDM = async () => {
     if (!dmTarget || !dmTexts[dmTarget.name]?.trim()) return;
-    await fetch('/api/inbox', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ postId: 'direct', senderKey: deviceKey, receiverKey: dmTarget.authorKey, content: dmTexts[dmTarget.name] }) });
+    
+    await fetch('/api/inbox', { 
+      method: 'POST', 
+      headers: { 'Content-Type': 'application/json' }, 
+      body: JSON.stringify({ 
+        postId: 'direct', 
+        senderKey: deviceKey, 
+        receiverKey: dmTarget.authorKey, 
+        content: dmTexts[dmTarget.name] 
+      }) 
+    });
+    
     setDmTexts({ ...dmTexts, [dmTarget.name]: '' });
     setDmTarget(null);
-    alert("Whisper sent privately!");
-  };
-
-  const toggleThread = (id: string) => {
-    const newSet = new Set(openThreads);
-    if (newSet.has(id)) newSet.delete(id); else newSet.add(id);
-    setOpenThreads(newSet);
+    alert("Whisper sent privately! Check your Inbox tab.");
   };
 
   const submitReply = async (postId: string) => {
@@ -147,6 +142,12 @@ export default function Home() {
     await fetch(`/api/posts/${postId}/comments`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content: text, display_name: 'Anonymous' }) });
     setReplyTexts({ ...replyTexts, [postId]: '' });
     fetchPosts();
+  };
+
+  const toggleThread = (id: string) => {
+    const newSet = new Set(openThreads);
+    if (newSet.has(id)) newSet.delete(id); else newSet.add(id);
+    setOpenThreads(newSet);
   };
 
   const restoreKey = () => {
@@ -195,8 +196,6 @@ export default function Home() {
 
       <main>  {viewingProfile ? (
     <div className="pb-10 relative">
-      
-      {/* DEDICATED MESSAGE ICON - TOP RIGHT OF PROFILE */}
       {viewingProfile.authorKey !== deviceKey && viewingProfile.authorKey !== 'me' && (
         <button onClick={() => setDmTarget(viewingProfile)} className="absolute top-4 right-4 p-3 bg-[#121214] border border-[#27272A] rounded-full hover:bg-[#7C3AED]/20 hover:border-[#7C3AED] transition-all z-10">
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-6 h-6 text-[#A1A1AA] hover:text-[#7C3AED]">
@@ -261,16 +260,16 @@ export default function Home() {
                 <span>{isMe ? 'You whispered' : 'Whisper received'}</span>
               </div>
               <p className="text-sm text-white mb-2">{msg.content}</p>
-              {!isMe && (
-                <div className="flex gap-2 mt-2">
-                  <input type="text" placeholder="Whisper back..." onChange={(e) => setDmTexts({...dmTexts, [msg.id]: e.target.value})} className="flex-1 bg-[#050505] border border-[#27272A] rounded-lg p-2 text-sm text-white outline-none focus:border-[#7C3AED]" />
-                  <button onClick={() => {
-                     fetch('/api/inbox', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ postId: msg.postId, senderKey: deviceKey, receiverKey: msg.senderKey, content: dmTexts[msg.id] })});
-                     setDmTexts({...dmTexts, [msg.id]: ''});
-                     fetchInbox();
-                  }} className="text-[#7C3AED] font-bold text-sm px-2">Send</button>
-                </div>
-              )}
+              
+              {/* REPLY BOX INSIDE INBOX */}
+              <div className="flex gap-2 mt-2">
+                <input type="text" placeholder="Reply..." onChange={(e) => setDmTexts({...dmTexts, [msg.id]: e.target.value})} className="flex-1 bg-[#050505] border border-[#27272A] rounded-lg p-2 text-sm text-white outline-none focus:border-[#7C3AED]" />
+                <button onClick={() => {
+                   fetch('/api/inbox', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ postId: msg.postId, senderKey: deviceKey, receiverKey: isMe ? msg.receiverKey : msg.senderKey, content: dmTexts[msg.id] })});
+                   setDmTexts({...dmTexts, [msg.id]: ''});
+                   setTimeout(fetchInbox, 500);
+                }} className="text-[#7C3AED] font-bold text-sm px-2">Send</button>
+              </div>
             </div>
           );
         })
@@ -287,7 +286,6 @@ export default function Home() {
 
       return (
         <div key={post.id} className="p-4 border-b border-[#27272A] hover:bg-[#121214]/40 transition-colors flex gap-3">
-          
           <div onClick={() => openProfile(post.displayName, post.authorKey || 'unknown')} className={`w-11 h-11 rounded-full flex-shrink-0 flex items-center justify-center font-bold text-lg text-white bg-gradient-to-br ${avatarGradient} cursor-pointer hover:opacity-80`}>
             {initial}
           </div>
