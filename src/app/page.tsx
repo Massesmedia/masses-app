@@ -120,11 +120,14 @@ export default function Home() {
   const sendDM = async () => {
     if (!dmTarget || !dmTexts[dmTarget.name]?.trim()) return;
     
+    // FIX: Generate a valid UUID instead of using 'direct'
+    const generatedUUID = crypto.randomUUID(); 
+
     await fetch('/api/inbox', { 
       method: 'POST', 
       headers: { 'Content-Type': 'application/json' }, 
       body: JSON.stringify({ 
-        postId: 'direct', 
+        postId: generatedUUID, 
         senderKey: deviceKey, 
         receiverKey: dmTarget.authorKey, 
         content: dmTexts[dmTarget.name] 
@@ -133,7 +136,7 @@ export default function Home() {
     
     setDmTexts({ ...dmTexts, [dmTarget.name]: '' });
     setDmTarget(null);
-    alert("Whisper sent privately! Check your Inbox tab.");
+    alert("Whisper sent privately!");
   };
 
   const submitReply = async (postId: string) => {
@@ -261,7 +264,6 @@ export default function Home() {
               </div>
               <p className="text-sm text-white mb-2">{msg.content}</p>
               
-              {/* REPLY BOX INSIDE INBOX */}
               <div className="flex gap-2 mt-2">
                 <input type="text" placeholder="Reply..." onChange={(e) => setDmTexts({...dmTexts, [msg.id]: e.target.value})} className="flex-1 bg-[#050505] border border-[#27272A] rounded-lg p-2 text-sm text-white outline-none focus:border-[#7C3AED]" />
                 <button onClick={() => {
