@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 
 type Comment = { id: string; displayName: string; content: string; gifUrl: string | null; createdAt: string };
 type Post = { id: string; displayName: string; content: string; gifUrl: string | null; authorKey: string | null; createdAt: string; comments: Comment[] };
-type DirectMessage = { id: string; postId: string; senderKey: string; receiverKey: string; content: string; createdAt: string };
+type DirectMessage = { id: string; postId: string | null; senderKey: string; receiverKey: string; content: string; createdAt: string };
 type ProfileData = { name: string; posts: Post[]; replies: Comment[]; authorKey: string };
 
 const Logo = ({ className }: { className?: string }) => (
@@ -120,14 +120,11 @@ export default function Home() {
   const sendDM = async () => {
     if (!dmTarget || !dmTexts[dmTarget.name]?.trim()) return;
     
-    // FIX: Generate a valid UUID instead of using 'direct'
-    const generatedUUID = crypto.randomUUID(); 
-
     await fetch('/api/inbox', { 
       method: 'POST', 
       headers: { 'Content-Type': 'application/json' }, 
       body: JSON.stringify({ 
-        postId: generatedUUID, 
+        postId: null, 
         senderKey: deviceKey, 
         receiverKey: dmTarget.authorKey, 
         content: dmTexts[dmTarget.name] 
@@ -136,7 +133,7 @@ export default function Home() {
     
     setDmTexts({ ...dmTexts, [dmTarget.name]: '' });
     setDmTarget(null);
-    alert("Whisper sent privately!");
+    alert("Whisper sent privately! Check your Inbox tab.");
   };
 
   const submitReply = async (postId: string) => {
@@ -267,7 +264,7 @@ export default function Home() {
               <div className="flex gap-2 mt-2">
                 <input type="text" placeholder="Reply..." onChange={(e) => setDmTexts({...dmTexts, [msg.id]: e.target.value})} className="flex-1 bg-[#050505] border border-[#27272A] rounded-lg p-2 text-sm text-white outline-none focus:border-[#7C3AED]" />
                 <button onClick={() => {
-                   fetch('/api/inbox', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ postId: msg.postId, senderKey: deviceKey, receiverKey: isMe ? msg.receiverKey : msg.senderKey, content: dmTexts[msg.id] })});
+                   fetch('/api/inbox', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ postId: null, senderKey: deviceKey, receiverKey: isMe ? msg.receiverKey : msg.senderKey, content: dmTexts[msg.id] })});
                    setDmTexts({...dmTexts, [msg.id]: ''});
                    setTimeout(fetchInbox, 500);
                 }} className="text-[#7C3AED] font-bold text-sm px-2">Send</button>
