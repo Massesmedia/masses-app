@@ -12,6 +12,7 @@ model Post {
   displayName String    @default("Anonymous") @map("display_name") @db.VarChar(28)
   content     String    @db.Text
   gifUrl      String?   @map("gif_url") @db.Text
+  authorKey   String?   @map("author_key") @db.Text
   createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
   comments    Comment[]
 
@@ -30,4 +31,16 @@ model Comment {
 
   @@index([postId, createdAt(sort: Asc)])
   @@map("comments")
+}
+
+model DirectMessage {
+  id          String   @id @default(uuid()) @db.Uuid
+  postId      String   @map("post_id") @db.Uuid
+  senderKey   String   @map("sender_key") @db.Text
+  receiverKey String   @map("receiver_key") @db.Text
+  content     String   @db.Text
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  @@index([receiverKey, createdAt(sort: Desc)])
+  @@map("direct_messages")
 }
