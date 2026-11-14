@@ -46,7 +46,6 @@ export default function Home() {
   const [viewingProfile, setViewingProfile] = useState<ProfileData | null>(null);
   const [profileTab, setProfileTab] = useState<'echoes' | 'whispers'>('echoes');
   
-  // DM State (Triggered ONLY from Profile)
   const [dmTarget, setDmTarget] = useState<ProfileData | null>(null);
 
   useEffect(() => {
@@ -102,7 +101,15 @@ export default function Home() {
         if (c.displayName === name) userReplies.push(c);
       });
     });
-    setViewingProfile({ name, posts: userPosts, replies: userReplies, authorKey });
+    // Check if this profile belongs to you based on posts OR key
+    const isMe = userPosts.some(p => p.authorKey === deviceKey) || authorKey === deviceKey;
+    
+    setViewingProfile({ 
+      name, 
+      posts: userPosts, 
+      replies: userReplies, 
+      authorKey: isMe ? (deviceKey || 'me') : authorKey 
+    });
     setProfileTab('echoes');
   };
 
@@ -187,20 +194,25 @@ export default function Home() {
       )}
 
       <main>  {viewingProfile ? (
-    <div className="pb-10">
-      <div className="p-6 border-b border-[#27272A] flex flex-col items-center bg-[#121214]/50">
-        <div className={`w-20 h-20 rounded-full flex items-center justify-center font-bold text-3xl text-white bg-gradient-to-br ${getAvatarGradient(viewingProfile.name)} mb-4 shadow-lg`}>
+    <div className="pb-10 relative">
+      
+      {/* DEDICATED MESSAGE ICON - TOP RIGHT OF PROFILE */}
+      {viewingProfile.authorKey !== deviceKey && viewingProfile.authorKey !== 'me' && (
+        <button onClick={() => setDmTarget(viewingProfile)} className="absolute top-4 right-4 p-3 bg-[#121214] border border-[#27272A] rounded-full hover:bg-[#7C3AED]/20 hover:border-[#7C3AED] transition-all z-10">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-6 h-6 text-[#A1A1AA] hover:text-[#7C3AED]">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
+          </svg>
+        </button>
+      )}
+
+      <div className="p-6 border-b border-[#27272A] flex flex-col items-center bg-[#121214]/50 pt-10">
+        <div className={`w-24 h-24 rounded-full flex items-center justify-center font-bold text-4xl text-white bg-gradient-to-br ${getAvatarGradient(viewingProfile.name)} mb-4 shadow-lg`}>
           {viewingProfile.name.charAt(0).toUpperCase()}
         </div>
         <h2 className="text-2xl font-bold text-white mb-1">{viewingProfile.name}</h2>
         <p className="text-xs text-[#A1A1AA] mb-4">Anonymous Identity</p>
         
-        {viewingProfile.authorKey !== deviceKey && viewingProfile.authorKey !== 'unknown' ? (
-          <button onClick={() => setDmTarget(viewingProfile)} className="px-6 py-2 bg-gradient-to-r from-[#7C3AED] to-[#DB2777] text-white font-bold rounded-full shadow-lg hover:opacity-90 active:scale-95 transition-all flex items-center gap-2">
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" /></svg>
-            Message
-          </button>
-        ) : (
+        {(viewingProfile.authorKey === deviceKey || viewingProfile.authorKey === 'me') && (
           <span className="px-4 py-1 bg-[#27272A] text-[#A1A1AA] text-xs font-bold rounded-full">This is You</span>
         )}
       </div>
@@ -276,13 +288,11 @@ export default function Home() {
       return (
         <div key={post.id} className="p-4 border-b border-[#27272A] hover:bg-[#121214]/40 transition-colors flex gap-3">
           
-          {/* AVATAR CLICK - GO TO PROFILE */}
           <div onClick={() => openProfile(post.displayName, post.authorKey || 'unknown')} className={`w-11 h-11 rounded-full flex-shrink-0 flex items-center justify-center font-bold text-lg text-white bg-gradient-to-br ${avatarGradient} cursor-pointer hover:opacity-80`}>
             {initial}
           </div>
 
           <div className="flex-1 min-w-0">
-            {/* NAME CLICK - GO TO PROFILE */}
             <div onClick={() => openProfile(post.displayName, post.authorKey || 'unknown')} className="flex justify-between text-[13px] text-[#A1A1AA] mb-1 font-medium items-center cursor-pointer hover:text-white">
               <span className="truncate">
                 {post.displayName} <span className="text-[11px] ml-1 opacity-70">ID:{post.id.slice(0,4)}</span>
@@ -332,7 +342,6 @@ export default function Home() {
   </button>
 )}
 
-{/* DM MODAL */}
 {dmTarget && (
   <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" onClick={() => setDmTarget(null)}>
     <div className="w-full max-w-[400px] bg-[#121214] border border-[#27272A] rounded-2xl p-5 shadow-2xl" onClick={e => e.stopPropagation()}>
