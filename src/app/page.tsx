@@ -16,14 +16,8 @@ const Logo = ({ className }: { className?: string }) => (
   </svg>
 );
 
-// Generates a unique color gradient based on the user's name
 const getAvatarGradient = (name: string) => {
-  const colors = [
-    'from-[#FF416C] to-[#FF4B2B]', 'from-[#00B4DB] to-[#0083B0]',
-    'from-[#8E2DE2] to-[#4A00E0]', 'from-[#11998e] to-[#38ef7d]',
-    'from-[#FC5C7D] to-[#6A82FB]', 'from-[#F2994A] to-[#F2C94C]',
-    'from-[#7C3AED] to-[#DB2777]'
-  ];
+  const colors = ['from-[#FF416C] to-[#FF4B2B]', 'from-[#00B4DB] to-[#0083B0]', 'from-[#8E2DE2] to-[#4A00E0]', 'from-[#11998e] to-[#38ef7d]', 'from-[#FC5C7D] to-[#6A82FB]', 'from-[#F2994A] to-[#F2C94C]', 'from-[#7C3AED] to-[#DB2777]'];
   let hash = 0;
   for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
   return colors[Math.abs(hash) % colors.length];
@@ -67,9 +61,9 @@ export default function Home() {
     setIsLoading(true);
     let url = '/api/posts';
     if (tab === 'my-posts') {
-      const ids = JSON.parse(localStorage.getItem('masses_my_posts') || '[]');
-      if (ids.length === 0) { setPosts([]); setIsLoading(false); return; }
-      url = `/api/posts?ids=${ids.join(',')}`;
+      // FIX: Fetch based on the Database authorKey, not just LocalStorage!
+      if (!deviceKey) return;
+      url = `/api/posts?authorKey=${deviceKey}`;
     } else if (tab === 'search' && searchQuery) {
       url = `/api/posts?q=${encodeURIComponent(searchQuery)}`;
     } else {
@@ -135,8 +129,9 @@ export default function Home() {
         localStorage.setItem('masses_device_key', cleanKey);
         setDeviceKey(cleanKey);
         setIsMenuOpen(false);
-        alert("Identity Restored!");
-        if (tab === 'inbox') fetchInbox(); else fetchPosts();
+        alert("Identity Restored! Your posts and inbox are now available.");
+        // Force a hard refresh of the page to clear old state
+        window.location.reload();
       } else { alert("Invalid key format."); }
     }
   };
@@ -207,14 +202,20 @@ export default function Home() {
             return (
               <div key={post.id} className="p-4 border-b border-[#27272A] hover:bg-[#121214]/40 transition-colors flex gap-3">
                 
-                {/* AVATAR */}
-                <div onClick={() => { if (!isAuthor && post.authorKey) setMessagingPost(post); }} className={`w-11 h-11 rounded-full flex-shrink-0 flex items-center justify-center font-bold text-lg text-white bg-gradient-to-br ${avatarGradient} ${!isAuthor && post.authorKey ? 'cursor-pointer hover:opacity-80' : ''}`}>
+                {/* CLICK ENTIRE POST TO DM (IF NOT AUTHOR) */}
+                <div 
+                  onClick={() => { if (!isAuthor && post.authorKey) setMessagingPost(post); }} 
+                  className={`w-11 h-11 rounded-full flex-shrink-0 flex items-center justify-center font-bold text-lg text-white bg-gradient-to-br ${avatarGradient} ${!isAuthor && post.authorKey ? 'cursor-pointer hover:opacity-80' : ''}`}
+                >
                   {initial}
                 </div>
 
                 <div className="flex-1 min-w-0">
-                  <div className="flex justify-between text-[13px] text-[#A1A1AA] mb-1 font-medium items-center">
-                    <span onClick={() => { if (!isAuthor && post.authorKey) setMessagingPost(post); }} className={`truncate ${!isAuthor && post.authorKey ? 'cursor-pointer hover:text-white' : ''}`}>
+                  <div 
+                    onClick={() => { if (!isAuthor && post.authorKey) setMessagingPost(post); }}
+                    className={`flex justify-between text-[13px] text-[#A1A1AA] mb-1 font-medium items-center ${!isAuthor && post.authorKey ? 'cursor-pointer hover:text-white' : ''}`}
+                  >
+                    <span className="truncate">
                       {post.displayName} <span className="text-[11px] ml-1 opacity-70">ID:{post.id.slice(0,4)}</span>
                     </span>
                     <span className="flex-shrink-0 ml-2">{new Date(post.createdAt).toLocaleDateString()}</span>
@@ -278,7 +279,6 @@ export default function Home() {
         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-6 h-6 text-white"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
       </button>
 
-      {/* BIGGER BOTTOM NAVIGATION ICONS */}
       <nav className="fixed bottom-0 left-0 right-0 max-w-[600px] mx-auto bg-[#050505]/95 backdrop-blur-xl border-t border-[#27272A] flex justify-around items-center h-16 z-50 px-2">
         <button onClick={() => setTab('feed')} className={`flex flex-col items-center justify-center w-full h-full ${tab === 'feed' ? 'text-[#7C3AED]' : 'text-[#A1A1AA] hover:text-white'}`}>
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-7 h-7"><path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12l8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25" /></svg>
