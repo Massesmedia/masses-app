@@ -62,15 +62,9 @@ export default function Home() {
   const fetchPosts = async () => {
     setIsLoading(true);
     let url = '/api/posts';
-    
-    if (tab === 'my-posts') {
-      // ALWAYS use the key from the database to find "My Posts"
-      url = `/api/posts?authorKey=${deviceKey}`;
-    } else if (tab === 'search' && searchQuery) {
-      url = `/api/posts?q=${encodeURIComponent(searchQuery)}`;
-    } else {
-      url = `/api/posts?sort=${sort}`;
-    }
+    if (tab === 'my-posts') url = `/api/posts?authorKey=${deviceKey}`;
+    else if (tab === 'search' && searchQuery) url = `/api/posts?q=${encodeURIComponent(searchQuery)}`;
+    else url = `/api/posts?sort=${sort}`;
     
     const res = await fetch(url);
     const data = await res.json();
@@ -202,33 +196,29 @@ export default function Home() {
             const initial = post.displayName.charAt(0).toUpperCase();
 
             return (
-              <div key={post.id} className="p-4 border-b border-[#27272A] hover:bg-[#121214]/40 transition-colors flex gap-3 relative">
+              <div key={post.id} className="p-4 border-b border-[#27272A] hover:bg-[#121214]/40 transition-colors flex gap-3">
                 
-                {/* FIXED AVATAR CLICK */}
-                <div 
-                  onClick={(e) => { 
-                    e.stopPropagation(); 
-                    if (!isAuthor && post.authorKey) setActiveDmPost(post); 
-                  }} 
-                  className={`relative z-50 w-11 h-11 rounded-full flex-shrink-0 flex items-center justify-center font-bold text-lg text-white bg-gradient-to-br ${avatarGradient} ${!isAuthor && post.authorKey ? 'cursor-pointer hover:opacity-80 active:scale-95' : ''}`}
+                {/* FIXED BUTTON FOR AVATAR */}
+                <button 
+                  onClick={() => { if (!isAuthor && post.authorKey) setActiveDmPost(post); }} 
+                  disabled={isAuthor || !post.authorKey}
+                  className={`w-11 h-11 rounded-full flex-shrink-0 flex items-center justify-center font-bold text-lg text-white bg-gradient-to-br ${avatarGradient} ${!isAuthor && post.authorKey ? 'cursor-pointer hover:opacity-80 active:scale-95' : ''}`}
                 >
                   {initial}
-                </div>
+                </button>
 
                 <div className="flex-1 min-w-0">
-                  {/* FIXED NAME CLICK */}
-                  <div 
-                    onClick={(e) => { 
-                      e.stopPropagation(); 
-                      if (!isAuthor && post.authorKey) setActiveDmPost(post); 
-                    }}
-                    className={`relative z-50 flex justify-between text-[13px] text-[#A1A1AA] mb-1 font-medium items-center ${!isAuthor && post.authorKey ? 'cursor-pointer hover:text-white' : ''}`}
+                  {/* FIXED BUTTON FOR NAME */}
+                  <button 
+                    onClick={() => { if (!isAuthor && post.authorKey) setActiveDmPost(post); }}
+                    disabled={isAuthor || !post.authorKey}
+                    className={`flex w-full justify-between text-[13px] text-[#A1A1AA] mb-1 font-medium items-center text-left ${!isAuthor && post.authorKey ? 'cursor-pointer hover:text-white' : ''}`}
                   >
                     <span className="truncate">
                       {post.displayName} <span className="text-[11px] ml-1 opacity-70">ID:{post.id.slice(0,4)}</span>
                     </span>
                     <span className="flex-shrink-0 ml-2">{new Date(post.createdAt).toLocaleDateString()}</span>
-                  </div>
+                  </button>
 
                   <p className="text-[16px] mb-3 whitespace-pre-wrap leading-relaxed">{post.content}</p>
                   
