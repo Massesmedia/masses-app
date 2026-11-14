@@ -46,8 +46,8 @@ export default function Home() {
   const [viewingProfile, setViewingProfile] = useState<ProfileData | null>(null);
   const [profileTab, setProfileTab] = useState<'echoes' | 'whispers'>('echoes');
   const [dmTarget, setDmTarget] = useState<ProfileData | null>(null);
-  
-  const [inboxTab, setInboxTab] = useState<'received' | 'sent'>('received');
+
+  const [trendingTags, setTrendingTags] = useState<{tag: string, count: number}[]>([]);
 
   useEffect(() => {
     let key = localStorage.getItem('masses_device_key');
@@ -58,6 +58,14 @@ export default function Home() {
     setDeviceKey(key);
     const savedTab = localStorage.getItem('masses_current_tab');
     if (savedTab) setTabState(savedTab as any);
+
+    // Fetch Trending Tags
+    const fetchTrends = async () => {
+      const res = await fetch('/api/posts', { method: 'PATCH' });
+      const data = await res.json();
+      if (data.trending) setTrendingTags(data.trending);
+    };
+    fetchTrends();
   }, []);
 
   useEffect(() => {
@@ -179,7 +187,6 @@ export default function Home() {
   return (
     <div className="max-w-[600px] mx-auto min-h-screen pb-24 bg-[#08090D] text-[#F4F4F7] font-sans selection:bg-[#8B5CF6]/30">
       
-      {/* HEADER */}
       <header className="sticky top-0 bg-[#08090D]/90 backdrop-blur-xl border-b border-[#242632] p-4 flex justify-between items-center z-40">
         <div className="flex items-center gap-3">
           {viewingProfile ? (
@@ -202,19 +209,6 @@ export default function Home() {
           </button>
         )}
       </header>
-
-      {/* TOP NAVIGATION PILLS */}
-      {!viewingProfile && (
-        <div className="p-4 pb-2">
-          <div className="flex bg-[#14151C] p-1 rounded-full border border-[#242632]">
-            {(['feed', 'search', 'my-posts', 'inbox'] as const).map(t => (
-              <button key={t} onClick={() => setTab(t)} className={`flex-1 py-2 text-[13px] font-semibold rounded-full transition-all ${tab === t ? 'bg-gradient-to-r from-[#8B5CF6] to-[#DB2777] text-white shadow-lg' : 'text-[#9CA3AF] hover:text-white'}`}>
-                {t === 'feed' ? 'Echoes' : t === 'search' ? 'Explore' : t === 'my-posts' ? 'My Echoes' : 'DM'}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
 
       <main>  {viewingProfile ? (
     <div className="pb-10 relative">
@@ -277,20 +271,36 @@ export default function Home() {
       </div>
 
       <div>
-        <h3 className="text-sm font-bold text-[#F4F4F7] mb-3">Popular Topics</h3>
+        <h3 className="text-sm font-bold text-[#F4F4F7] mb-3">Trending Topics</h3>
         <div className="flex flex-wrap gap-2">
-          {['Life', 'Tech', 'Society', 'Ideas', 'Mindset', 'Future'].map(topic => (
-            <button key={topic} onClick={() => setSearchQuery(topic)} className="px-4 py-2 bg-[#14151C] border border-[#242632] rounded-full text-sm text-[#9CA3AF] hover:text-white hover:border-[#8B5CF6] transition-all">
-              {topic}
-            </button>
-          ))}
+          {trendingTags.length === 0 ? (
+            <p className="text-xs text-[#9CA3AF]">No trends yet. Start a hashtag!</p>
+          ) : (
+            trendingTags.map(t => (
+              <button 
+                key={t.tag} 
+                onClick={() => setSearchQuery(t.tag)} 
+                className="px-4 py-2 bg-[#14151C] border border-[#242632] rounded-full text-sm text-[#9CA3AF] hover:text-white hover:border-[#8B5CF6] transition-all flex items-center gap-2"
+              >
+                {t.tag}
+                <span className="text-[10px] bg-[#242632] px-2 py-0.5 rounded-full">{t.count}</span>
+              </button>
+            ))
+          )}
         </div>
       </div>
 
-      <div className="mt-8 p-6 bg-gradient-to-br from-[#8B5CF6] to-[#DB2777] rounded-2xl">
+      <button 
+        onClick={() => {
+          setSearchQuery(''); 
+          setSort('hot');     
+          setTab('feed');     
+        }} 
+        className="w-full text-left mt-8 p-6 bg-gradient-to-br from-[#8B5CF6] to-[#DB2777] rounded-2xl hover:scale-[1.02] active:scale-95 transition-all"
+      >
         <h2 className="text-xl font-bold text-white mb-2">Search. Discover. Explore.</h2>
         <p className="text-white/80 text-sm">Find what the masses are saying.</p>
-      </div>
+      </button>
 
       {posts.length > 0 && (
         <div className="mt-6">
@@ -305,27 +315,43 @@ export default function Home() {
     </div>
 
   ) : tab === 'inbox' ? (
-    <div className="p-4">
-      <div className="flex bg-[#14151C] p-1 rounded-full border border-[#242632] mb-6">
-        <button onClick={() => setInboxTab('received')} className={`flex-1 py-2 text-sm font-semibold rounded-full transition-all ${inboxTab === 'received' ? 'bg-[#242632] text-white' : 'text-[#9CA3AF]'}`}>Inbox</button>
-        <button onClick={() => setInboxTab('sent')} className={`flex-1 py-2 text-sm font-semibold rounded-full transition-all ${inboxTab === 'sent' ? 'bg-[#242632] text-white' : 'text-[#9CA3AF]'}`}>Sent</button>
-      </div>
-
-      <div className="space-y-3">
-        {inboxMessages.filter(m => inboxTab === 'received' ? m.receiverKey === deviceKey : m.senderKey === deviceKey).length === 0 ? (
-          <div className="text-center text-[#9CA3AF] mt-10">No Whispers here yet.</div>
+    <div className="p-4 flex flex-col space-y-4">
+      <div className="flex flex-col space-y-4">
+        {inboxMessages.length === 0 ? (
+          <div className="text-center text-[#9CA3AF] mt-10">No Whispers yet.</div>
         ) : (
-          inboxMessages.filter(m => inboxTab === 'received' ? m.receiverKey === deviceKey : m.senderKey === deviceKey).map(msg => (
-            <div key={msg.id} className="p-4 bg-[#14151C] border border-[#242632] rounded-xl">
-              <p className="text-[15px] text-[#F4F4F7] mb-2">{msg.content}</p>
-              <div className="flex justify-between items-center text-xs text-[#9CA3AF]">
-                <span>{inboxTab === 'received' ? 'Received' : 'Sent'}</span>
-                <span>{timeAgo(msg.createdAt)}</span>
+          inboxMessages.map(msg => {
+            const isMe = msg.senderKey === deviceKey;
+            return (
+              <div key={msg.id} className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
+                <span className="text-[10px] text-[#9CA3AF] mb-1 px-1">{isMe ? 'You' : 'Anonymous'}</span>
+                
+                <div className={`max-w-[80%] p-3 rounded-2xl ${isMe ? 'bg-gradient-to-br from-[#8B5CF6] to-[#DB2777] text-white rounded-br-sm' : 'bg-[#14151C] border border-[#242632] text-[#F4F4F7] rounded-bl-sm'}`}>
+                  <p className="text-[15px]">{msg.content}</p>
+                </div>
+                
+                <span className="text-[10px] text-[#9CA3AF] mt-1 px-1">{timeAgo(msg.createdAt)}</span>
               </div>
-            </div>
-          ))
+            )
+          })
         )}
       </div>
+
+      {inboxMessages.length > 0 && (
+        <div className="fixed bottom-16 left-0 right-0 max-w-[600px] mx-auto p-3 bg-[#08090D]/95 backdrop-blur-xl border-t border-[#242632]">
+          <div className="flex gap-2">
+            <input type="text" placeholder="Reply to whisper..." onChange={(e) => setDmTexts({...dmTexts, 'reply': e.target.value})} className="flex-1 bg-[#14151C] border border-[#242632] rounded-full px-4 py-2 text-sm text-white outline-none focus:border-[#8B5CF6]" />
+            <button onClick={() => {
+               const lastMsg = inboxMessages[0];
+               if (dmTexts['reply']?.trim() && lastMsg) {
+                 fetch('/api/inbox', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ senderKey: deviceKey, receiverKey: lastMsg.senderKey === deviceKey ? lastMsg.receiverKey : lastMsg.senderKey, content: dmTexts['reply'] })});
+                 setDmTexts({...dmTexts, 'reply': ''});
+                 setTimeout(fetchInbox, 1000);
+               }
+            }} className="text-sm font-bold bg-[#8B5CF6] text-white px-4 rounded-full">Send</button>
+          </div>
+        </div>
+      )}
     </div>
 
   ) : posts.length === 0 ? (
@@ -384,14 +410,12 @@ export default function Home() {
         </div>
       );
   })}
-</main>      {/* FLOATING ACTION BUTTON */}
-      {tab === 'feed' && !viewingProfile && (
+</main>      {tab === 'feed' && !viewingProfile && (
         <button onClick={() => setIsComposerOpen(true)} className="fixed bottom-24 right-6 w-14 h-14 bg-gradient-to-r from-[#8B5CF6] to-[#DB2777] rounded-full flex items-center justify-center shadow-[0_4px_20px_rgba(139,92,246,0.4)] hover:scale-105 active:scale-95 transition-transform z-40">
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-6 h-6 text-white"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
         </button>
       )}
 
-      {/* DM MODAL */}
       {dmTarget && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" onClick={() => setDmTarget(null)}>
           <div className="w-full max-w-[400px] bg-[#14151C] border border-[#242632] rounded-2xl p-5 shadow-2xl" onClick={e => e.stopPropagation()}>
@@ -406,7 +430,6 @@ export default function Home() {
         </div>
       )}
 
-      {/* BOTTOM NAVIGATION */}
       <nav className="fixed bottom-0 left-0 right-0 max-w-[600px] mx-auto bg-[#08090D]/95 backdrop-blur-xl border-t border-[#242632] flex justify-around items-center h-16 z-50 px-2">
         <button onClick={() => setTab('feed')} className={`flex flex-col items-center justify-center w-full h-full gap-1 ${tab === 'feed' ? 'text-[#8B5CF6]' : 'text-[#9CA3AF] hover:text-white'}`}>
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-6 h-6"><path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12l8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25" /></svg>
@@ -426,7 +449,6 @@ export default function Home() {
         </button>
       </nav>
 
-      {/* SIDE MENU */}
       {isMenuOpen && (
         <div className="fixed inset-0 z-[100] flex" onClick={() => setIsMenuOpen(false)}>
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm"></div>
@@ -452,7 +474,6 @@ export default function Home() {
         </div>
       )}
 
-      {/* COMPOSER BOTTOM SHEET */}
       {isComposerOpen && (
         <div className="fixed inset-0 z-[100] flex items-end justify-center bg-black/60 backdrop-blur-sm" onClick={() => setIsComposerOpen(false)}>
           <div className="w-full max-w-[600px] bg-[#14151C] border-t border-[#242632] rounded-t-3xl p-6 shadow-2xl animate-[slideUp_0.3s_ease-out]" onClick={(e) => e.stopPropagation()}>
