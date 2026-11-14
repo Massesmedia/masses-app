@@ -27,7 +27,7 @@ export default function Home() {
   const [replyTexts, setReplyTexts] = useState<{ [key: string]: string }>({});
   const [canPost, setCanPost] = useState(true);
 
-  useEffect(() => { fetchPosts(); }, [sort, tab]);
+  useEffect(() => { fetchPosts(); }, [sort, tab, searchQuery]);
 
   const fetchPosts = async () => {
     setIsLoading(true);
@@ -75,40 +75,74 @@ export default function Home() {
   };
 
   return (
-    <div className="max-w-[600px] mx-auto min-h-screen border-x border-[#27272A] pb-20 bg-[#09090B] text-white">
-      <header className="sticky top-0 bg-[#09090B]/95 backdrop-blur-md p-4 border-b border-[#27272A] flex justify-between items-center z-50">
-        <div className="flex items-center gap-3"><Logo className="w-8 h-8 rounded-md" /><span className="text-xl font-extrabold tracking-widest uppercase">MASSES</span></div>
-        <button onClick={() => setSort(sort === 'new' ? 'hot' : 'new')} className="text-xs font-semibold text-[#A1A1AA] border border-[#27272A] px-2 py-1 rounded">{sort === 'new' ? 'NEW' : 'HOT'}</button>
+    <div className="max-w-[600px] mx-auto min-h-screen border-x border-[#27272A] pb-20 bg-[#050505] text-[#F4F4F5] font-sans" style={{ background: 'radial-gradient(circle at top, #111 0%, #050505 40%)' }}>
+      
+      <header className="sticky top-0 bg-[#050505]/80 backdrop-blur-xl border-b border-[#27272A] p-4 flex justify-between items-center z-50">
+        <div className="flex items-center gap-3">
+          <div className="relative">
+            <Logo className="w-8 h-8 rounded-[10px] relative z-10" />
+            <div className="absolute inset-0 bg-[#7C3AED] blur-md opacity-20 rounded-[10px] z-0"></div>
+          </div>
+          <span className="text-xl font-black tracking-[0.15em] bg-clip-text text-transparent bg-gradient-to-br from-[#7C3AED] to-[#DB2777]">MASSES</span>
+        </div>
+        <button onClick={() => setSort(sort === 'new' ? 'hot' : 'new')} className="text-xs font-semibold text-[#A1A1AA] border border-[#27272A] bg-[#121214] px-3 py-1.5 rounded-lg hover:text-white transition-colors">{sort === 'new' ? 'NEW' : 'HOT'}</button>
       </header>
-      <div className="flex border-b border-[#27272A] bg-[#121214]">
+
+      <div className="flex border-b border-[#27272A] bg-[#121214]/50">
         {(['feed', 'search', 'my-posts'] as const).map((t) => (
-          <button key={t} onClick={() => setTab(t)} className={`flex-1 p-3 text-sm font-semibold capitalize border-b-2 transition-colors ${tab === t ? 'text-white border-white' : 'text-[#A1A1AA] border-transparent'}`}>{t.replace('-', ' ')}</button>
+          <button key={t} onClick={() => setTab(t)} className={`flex-1 p-4 text-sm font-semibold capitalize relative transition-colors ${tab === t ? 'text-white' : 'text-[#A1A1AA] hover:text-white'}`}>
+            {t.replace('-', ' ')}
+            {tab === t && <div className="absolute bottom-0 left-[20%] right-[20%] h-[3px] bg-gradient-to-r from-[#7C3AED] to-[#DB2777] rounded-t-md"></div>}
+          </button>
         ))}
       </div>
-      {tab === 'search' && <form onSubmit={(e) => { e.preventDefault(); fetchPosts(); }} className="p-4 border-b border-[#27272A]"><input type="text" placeholder="Search thoughts..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full bg-[#121214] border border-[#27272A] rounded-lg p-3 text-white outline-none" /></form>}
-      {tab === 'feed' && (
-        <div className="p-5 border-b border-[#27272A] bg-[#121214]">
-          <input type="text" placeholder="Anonymous (Optional Name)" maxLength={28} value={displayName} onChange={(e) => setDisplayName(e.target.value)} className="w-full bg-transparent border-b border-[#27272A] pb-2 mb-2 text-xs text-[#A1A1AA] outline-none" />
-          <textarea value={content} onChange={(e) => setContent(e.target.value)} placeholder="What is on your mind?" className="w-full bg-transparent outline-none resize-none text-lg text-white" rows={2} />
-          <div className="flex justify-end mt-2"><button onClick={submitPost} disabled={!content.trim() || !canPost} className="bg-white text-black font-bold py-2 px-6 rounded-full disabled:opacity-30">{canPost ? 'Post' : 'Wait 60s'}</button></div>
+
+      {tab === 'search' && (
+        <div className="p-4 border-b border-[#27272A]">
+          <input type="text" placeholder="Search names or thoughts..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full bg-[#121214] border border-[#27272A] rounded-xl p-3 text-white outline-none focus:border-[#7C3AED] focus:ring-2 focus:ring-[#7C3AED]/20 transition-all" />
         </div>
       )}
+
+      {tab === 'feed' && (
+        <div className="m-4 p-5 rounded-2xl border border-[#27272A] bg-[#121214] shadow-2xl">
+          <input type="text" placeholder="Anonymous (Optional Name)" maxLength={28} value={displayName} onChange={(e) => setDisplayName(e.target.value)} className="w-full bg-transparent border-b border-[#27272A] pb-2 mb-3 text-xs text-[#A1A1AA] outline-none" />
+          <textarea value={content} onChange={(e) => setContent(e.target.value)} placeholder="What is on your mind?" className="w-full bg-transparent outline-none resize-none text-lg text-white placeholder-[#52525B]" rows={2} />
+          <div className="flex justify-between items-center mt-4 pt-4 border-t border-[#27272A]">
+            <span className="text-[13px] text-[#52525B] font-medium">Anonymous</span>
+            <button onClick={submitPost} disabled={!content.trim() || !canPost} className="bg-gradient-to-r from-[#7C3AED] to-[#DB2777] text-white font-bold py-2 px-6 rounded-full disabled:opacity-50 hover:opacity-90 transition-opacity shadow-[0_4px_15px_rgba(124,58,237,0.15)]">{canPost ? 'Post' : 'Wait 60s'}</button>
+          </div>
+        </div>
+      )}
+
       <main>
         {isLoading ? <div className="p-5 space-y-4">{[1,2,3].map(i => <div key={i} className="animate-pulse border border-[#27272A] p-5 rounded-xl"><div className="h-3 w-24 bg-[#27272A] rounded mb-4"></div><div className="h-4 w-full bg-[#27272A] rounded mb-2"></div><div className="h-4 w-2/3 bg-[#27272A] rounded"></div></div>)}</div> 
-        : posts.length === 0 ? <div className="flex flex-col items-center justify-center p-20 text-center"><Logo className="w-20 h-20 mb-6 opacity-80" /><p className="text-[#A1A1AA] text-sm">No thoughts found. Be the first voice.</p></div>
+        : posts.length === 0 ? <div className="flex flex-col items-center justify-center p-20 text-center"><Logo className="w-20 h-20 mb-6 opacity-50" /><p className="text-[#A1A1AA] text-sm">No thoughts found. Be the first voice.</p></div>
         : posts.map((post) => {
             const isOpen = openThreads.has(post.id);
             return (
-              <div key={post.id} className="p-5 border-b border-[#27272A]">
-                <div className="flex justify-between text-xs text-[#A1A1AA] mb-2"><span>{post.displayName} <span className="bg-[#27272A] px-1 rounded ml-1">ID:{post.id.slice(0,4)}</span></span><span>{new Date(post.createdAt).toLocaleDateString()}</span></div>
-                <p className="text-lg mb-4 whitespace-pre-wrap">{post.content}</p>
-                <button onClick={() => toggleThread(post.id)} className={`flex items-center gap-2 text-sm ${isOpen ? 'text-white' : 'text-[#A1A1AA]'}`}><span className={`text-[10px] transition-transform ${isOpen ? 'rotate-90' : ''}`}>▶</span>{post.comments.length} Replies</button>
+              <div key={post.id} className="p-5 border-b border-[#27272A] hover:bg-[#121214]/40 transition-colors">
+                <div className="flex justify-between text-[13px] text-[#A1A1AA] mb-3 font-medium">
+                  <span>{post.displayName} <span className="bg-white/5 border border-[#27272A] px-2 py-0.5 rounded-md ml-2 text-[11px]">ID:{post.id.slice(0,4)}</span></span>
+                  <span>{new Date(post.createdAt).toLocaleDateString()}</span>
+                </div>
+                <p className="text-[17px] mb-4 whitespace-pre-wrap leading-relaxed">{post.content}</p>
+                
+                <button onClick={() => toggleThread(post.id)} className={`flex items-center gap-2 text-sm font-medium px-3 py-2 -ml-3 rounded-lg transition-colors ${isOpen ? 'text-[#7C3AED]' : 'text-[#A1A1AA] hover:text-[#7C3AED] hover:bg-[#7C3AED]/10'}`}>
+                  <span className={`text-[10px] transition-transform ${isOpen ? 'rotate-90' : ''}`}>▶</span>
+                  {post.comments.length} Replies
+                </button>
+
                 {isOpen && (
-                  <div className="mt-4 pl-4 border-l border-[#27272A] space-y-4">
-                    {post.comments.map(c => <div key={c.id} className="text-sm"><span className="text-xs text-[#A1A1AA] block mb-1">{c.displayName}</span>{c.content}</div>)}
-                    <div className="flex gap-2 mt-2">
-                      <input type="text" placeholder="Reply..." value={replyTexts[post.id] || ''} onChange={(e) => setReplyTexts({ ...replyTexts, [post.id]: e.target.value })} className="flex-1 bg-[#09090B] border border-[#27272A] rounded p-2 text-sm outline-none text-white" onKeyDown={(e) => e.key === 'Enter' && submitReply(post.id)} />
-                      <button onClick={() => submitReply(post.id)} className="text-sm font-bold px-2">Reply</button>
+                  <div className="mt-4 pl-5 border-l-2 border-[#27272A] space-y-3">
+                    {post.comments.map(c => (
+                      <div key={c.id} className="text-[15px] bg-[#121214] p-3 rounded-xl border border-[#27272A]">
+                        <span className="text-xs text-[#A1A1AA] block mb-1 font-semibold">{c.displayName}</span>
+                        {c.content}
+                      </div>
+                    ))}
+                    <div className="flex gap-2 mt-3">
+                      <input type="text" placeholder="Reply anonymously..." value={replyTexts[post.id] || ''} onChange={(e) => setReplyTexts({ ...replyTexts, [post.id]: e.target.value })} className="flex-1 bg-[#050505] border border-[#27272A] rounded-xl p-3 text-sm outline-none focus:border-[#7C3AED] transition-all text-white" onKeyDown={(e) => e.key === 'Enter' && submitReply(post.id)} />
+                      <button onClick={() => submitReply(post.id)} className="text-sm font-bold px-3 text-[#7C3AED] hover:text-[#9d6bff]">Reply</button>
                     </div>
                   </div>
                 )}
