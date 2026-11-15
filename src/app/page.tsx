@@ -77,7 +77,6 @@ export default function Home() {
     }
   }, [cooldown]);
 
-  // Auto-scroll to bottom of Inbox
   useEffect(() => {
     if (tab === 'inbox' && inboxMessages.length > 0) {
       chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -175,10 +174,16 @@ export default function Home() {
 
   const restoreKey = () => {
     const input = prompt("Paste your Secret Recovery Key here:");
-    if (input && input.trim().startsWith('rk_')) {
-      localStorage.setItem('masses_device_key', input.trim());
-      window.location.reload(); 
-    } else { alert("Invalid key format."); }
+    if (input) {
+      const cleanKey = input.trim();
+      // Accept both dk_ and rk_ formats
+      if (cleanKey.startsWith('dk_') || cleanKey.startsWith('rk_')) {
+        localStorage.setItem('masses_device_key', cleanKey);
+        window.location.reload(); 
+      } else { 
+        alert("Invalid key format."); 
+      }
+    }
   };
 
   const timeAgo = (date: string) => {
